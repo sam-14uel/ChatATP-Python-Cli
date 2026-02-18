@@ -242,65 +242,98 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
     """Send message to chatroom"""
     check_auth()
     try:
-        console.print("[bold blue]Sending message...[/bold blue]")
-
         full_response = ""
         in_think_block = False
         chunk_count = 0
+        response_started = False
+        active_tool = None
 
-        for chunk in api.send_chat_message_stream(
-            room_id=room_id,
-            message=message,
-            model=model,
-            toolkit_ids=list(toolkits) if toolkits else None,
-            mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
-        ):
-            chunk_count += 1
+        # Show a styled status spinner while waiting for first token
+        with console.status("[bold cyan] Sending message to ChatATP...[/bold cyan]", spinner="dots") as status:
+            stream = api.send_chat_message_stream(
+                room_id=room_id,
+                message=message,
+                model=model,
+                toolkit_ids=list(toolkits) if toolkits else None,
+                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
+            )
 
-            if debug:
-                console.print(f"[dim]CHUNK #{chunk_count}: {chunk}[/dim]")
+            for chunk in stream:
+                chunk_count += 1
 
-            if chunk.get('message_type') == 'chat_message':
-                message_chunk = chunk.get('message', '')
+                if debug:
+                    console.print(f"[dim]CHUNK #{chunk_count}: {chunk}[/dim]")
 
-                if message_chunk:
-                    # Handle <think> blocks (DeepSeek R1 reasoning)
-                    if '<think>' in message_chunk:
-                        in_think_block = True
+                msg_type = chunk.get('message_type', '')
 
-                    if in_think_block:
-                        if '</think>' in message_chunk:
-                            in_think_block = False
-                        else:
-                            console.print("⏳ [dim yellow]Thinking...[/dim yellow]", end='\r')
-                        continue
+                if msg_type == 'chat_message':
+                    message_chunk = chunk.get('message', '')
 
-                    # Print each chunk directly as it arrives
-                    console.print(message_chunk, end='', highlight=False)
-                    full_response += message_chunk
+                    if message_chunk:
+                        # Handle <think> blocks (DeepSeek R1 reasoning)
+                        if '<think>' in message_chunk:
+                            in_think_block = True
 
-                if chunk.get('is_typing') == False:
-                    break
+                        if in_think_block:
+                            if '</think>' in message_chunk:
+                                in_think_block = False
+                                status.update("[bold cyan] Processing...[/bold cyan]")
+                            else:
+                                status.update("[bold yellow]💭 Thinking...[/bold yellow]")
+                            continue
 
-            elif chunk.get('message_type') == 'tool_call':
-                tool_name = chunk.get('tool_name', 'unknown')
-                console.print(f"\n🔧 [dim cyan]Using tool: {tool_name}...[/dim cyan]")
+                        # First real content token — stop spinner, print header
+                        if not response_started:
+                            response_started = True
+                            status.stop()
+                            console.print()
+                            console.print(Panel.fit(
+                                "",
+                                title="[bold magenta]ChatATP[/bold magenta]",
+                                border_style="magenta",
+                                padding=(0, 1)
+                            ))
 
-            elif chunk.get('message_type') == 'tool_result':
-                console.print(f"✅ [dim cyan]Tool complete[/dim cyan]")
+                        console.print(message_chunk, end='', highlight=False)
+                        full_response += message_chunk
 
-        console.print()  # final newline
+                    if chunk.get('is_typing') == False:
+                        break
 
-        if not full_response and chunk_count == 0:
-            console.print("[red]No chunks received at all - check api_client stream parsing[/red]")
-        elif not full_response:
-            console.print(f"[yellow]Received {chunk_count} chunks but no displayable message content.[/yellow]")
-            console.print("[yellow]Run with --debug flag to inspect raw chunks.[/yellow]")
+                elif msg_type == 'tool_call':
+                    # Try every likely field name for the tool name
+                    tool_name = (
+                        chunk.get('tool_name')
+                        or chunk.get('name')
+                        or chunk.get('tool')
+                        or chunk.get('function', {}).get('name')
+                        or chunk.get('data', {}).get('tool_name')
+                        or chunk.get('data', {}).get('name')
+                        or 'tool'
+                    )
+                    active_tool = tool_name
+                    status.update(f"[bold cyan]🔧 Using tool: [yellow]{tool_name}[/yellow]...[/bold cyan]")
+
+                elif msg_type == 'tool_result':
+                    tool_label = active_tool or 'tool'
+                    status.update(f"[bold cyan]✅ [yellow]{tool_label}[/yellow] complete — processing...[/bold cyan]")
+                    active_tool = None
+
+        # Final newline after streamed content
+        if response_started:
+            console.print()
+            console.print(f"[dim]─── [italic]End of response[/italic] ───[/dim]")
+        elif chunk_count == 0:
+            console.print("[red]✗ No data received — check your api_client stream parsing.[/red]")
+        else:
+            console.print(f"[yellow]⚠ Received {chunk_count} chunks but no message content.[/yellow]")
+            console.print("[dim]Tip: Run with --debug to inspect raw chunk structure.[/dim]")
 
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
-        import traceback
-        traceback.print_exc()
+        console.print(f"[red]✗ Error: {e}[/red]")
+        if debug:
+            import traceback
+            traceback.print_exc()
 
 # Integrations commands
 @cli.group()
