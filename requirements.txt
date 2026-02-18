@@ -1,0 +1,5 @@
+requests
+click
+rich
+pyyaml
+python-dotenv
