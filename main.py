@@ -237,12 +237,16 @@ def new(message, model, toolkits, mcp_connections):
 @click.option('--model', default=None, help='Model to use')
 @click.option('--toolkits', multiple=True, help='Toolkit IDs to use')
 @click.option('--mcp-connections', multiple=True, help='MCP connection IDs to use')
-def send(room_id, message, model, toolkits, mcp_connections):
+@click.option('--debug', is_flag=True, help='Show raw stream chunks')
+def send(room_id, message, model, toolkits, mcp_connections, debug):
     """Send message to chatroom"""
     check_auth()
     try:
         console.print("[bold blue]Sending message...[/bold blue]")
+
         full_response = ""
+        in_think_block = False
+        chunk_count = 0
 
         for chunk in api.send_chat_message_stream(
             room_id=room_id,
@@ -251,19 +255,52 @@ def send(room_id, message, model, toolkits, mcp_connections):
             toolkit_ids=list(toolkits) if toolkits else None,
             mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
         ):
-            if chunk.get('message_type') == 'chat_message' and chunk.get('message'):
-                message_chunk = chunk['message']
-                if message_chunk and not message_chunk.startswith('{'):
-                    console.print(message_chunk, end='', style='green')
+            chunk_count += 1
+
+            if debug:
+                console.print(f"[dim]CHUNK #{chunk_count}: {chunk}[/dim]")
+
+            if chunk.get('message_type') == 'chat_message':
+                message_chunk = chunk.get('message', '')
+
+                if message_chunk:
+                    # Handle <think> blocks (DeepSeek R1 reasoning)
+                    if '<think>' in message_chunk:
+                        in_think_block = True
+
+                    if in_think_block:
+                        if '</think>' in message_chunk:
+                            in_think_block = False
+                        else:
+                            console.print("⏳ [dim yellow]Thinking...[/dim yellow]", end='\r')
+                        continue
+
+                    # Print each chunk directly as it arrives
+                    console.print(message_chunk, end='', highlight=False)
                     full_response += message_chunk
 
-            if chunk.get('is_typing') == False and chunk.get('assistant_chat_id'):
-                # Response complete
-                break
+                if chunk.get('is_typing') == False:
+                    break
 
-        console.print()  # New line after response
+            elif chunk.get('message_type') == 'tool_call':
+                tool_name = chunk.get('tool_name', 'unknown')
+                console.print(f"\n🔧 [dim cyan]Using tool: {tool_name}...[/dim cyan]")
+
+            elif chunk.get('message_type') == 'tool_result':
+                console.print(f"✅ [dim cyan]Tool complete[/dim cyan]")
+
+        console.print()  # final newline
+
+        if not full_response and chunk_count == 0:
+            console.print("[red]No chunks received at all - check api_client stream parsing[/red]")
+        elif not full_response:
+            console.print(f"[yellow]Received {chunk_count} chunks but no displayable message content.[/yellow]")
+            console.print("[yellow]Run with --debug flag to inspect raw chunks.[/yellow]")
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
 
 # Integrations commands
 @cli.group()

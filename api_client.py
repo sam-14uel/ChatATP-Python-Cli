@@ -98,15 +98,36 @@ class ChatATPAPI:
 
         with self.session.post(url, json=data, stream=True) as response:
             response.raise_for_status()
+            buffer = ""
+
             for line in response.iter_lines():
-                if line:
-                    line = line.decode('utf-8')
-                    if line.startswith('data: '):
-                        try:
-                            chunk = json.loads(line[6:])
-                            yield chunk
-                        except json.JSONDecodeError:
-                            continue
+                if not line:
+                    continue
+
+                line = line.decode('utf-8')
+
+                # Handle SSE format: "data: {...}"
+                if line.startswith('data: '):
+                    line = line[6:]
+
+                # Skip SSE comments or keep-alive
+                if line.startswith(':'):
+                    continue
+
+                buffer += line
+
+                # Try to parse whatever is in the buffer
+                while buffer:
+                    buffer = buffer.strip()
+                    if not buffer:
+                        break
+                    try:
+                        chunk, idx = json.JSONDecoder().raw_decode(buffer)
+                        yield chunk
+                        buffer = buffer[idx:].strip()
+                    except json.JSONDecodeError:
+                        # Incomplete JSON, wait for more data
+                        break
 
     # Media endpoints
     def list_media(self, page: int = 1, page_size: int = 12, media_type: str = None, search: str = None) -> Dict:
