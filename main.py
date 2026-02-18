@@ -246,8 +246,9 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
         in_think_block = False
         chunk_count = 0
         response_started = False
+        tool_lines = []  # track printed tool lines to update them
 
-        with console.status("[bold cyan]Sending message to ChatATP...[/bold cyan]", spinner="dots") as status:
+        with console.status("[bold cyan]Sending...[/bold cyan]", spinner="dots") as status:
 
             for chunk in api.send_chat_message_stream(
                 room_id=room_id,
@@ -270,67 +271,60 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                     toolkit   = chunk.get('toolkit_name', '')
                     args      = tool.get('arguments', {})
 
-                    # Show key argument inline if present (e.g. the search query)
                     arg_hint = ''
                     if args:
                         first_val = next(iter(args.values()), None)
                         if first_val and isinstance(first_val, str) and len(first_val) < 60:
-                            arg_hint = f' [dim white]→ "{first_val}"[/dim white]'
+                            arg_hint = f' [dim]"{first_val}"[/dim]'
 
-                    # Print visibly above any streamed text
+                    # Print a running line — no emoji, clean mono style
                     console.print(
-                        f"\n[bold cyan]  🔧 [yellow]{tool_name}[/yellow]"
-                        f"[dim cyan] ({toolkit})[/dim cyan]{arg_hint}[/bold cyan]"
+                        f"\n  [dim]┌[/dim] [bold white]{tool_name}[/bold white]"
+                        f"[dim] · {toolkit}{arg_hint}[/dim]"
                     )
-                    status.update(f"[bold cyan]Running [yellow]{tool_name}[/yellow]...[/bold cyan]")
+                    status.update(
+                        f"[cyan]Running [bold]{tool_name}[/bold]...[/cyan]"
+                    )
 
                 # ── tool_result ────────────────────────────────────────────
                 elif msg_type == 'tool_result':
-                    tool_name  = chunk.get('tool_call_id', '')   # fallback
-                    # Get tool name from timing_metrics if available
                     executions = chunk.get('timing_metrics', {}).get('tool_executions', [])
                     if executions:
-                        last = executions[-1]
-                        tool_name = last.get('tool_name', tool_name)
+                        last      = executions[-1]
+                        tool_name = last.get('tool_name', 'tool')
                         duration  = last.get('execution_duration', 0)
-                        status_ok = last.get('status', 'success')
-                        icon      = '✅' if status_ok == 'success' else '❌'
+                        ok        = last.get('status', 'success') == 'success'
+                        mark      = '[bold green]done[/bold green]' if ok else '[bold red]failed[/bold red]'
                         console.print(
-                            f"  {icon} [green]{tool_name}[/green] "
-                            f"[dim]completed in {duration:.2f}s[/dim]\n"
+                            f"  [dim]└[/dim] {mark} [dim]{duration:.2f}s[/dim]"
                         )
                     else:
-                        console.print(f"  ✅ [green]Tool complete[/green]\n")
+                        console.print(f"  [dim]└[/dim] [bold green]done[/bold green]")
 
-                    status.update("[bold cyan]Processing results...[/bold cyan]")
+                    status.update("[cyan]Processing...[/cyan]")
 
                 # ── chat_message ───────────────────────────────────────────
                 elif msg_type == 'chat_message':
                     message_chunk = chunk.get('message', '')
 
                     if message_chunk:
-                        # Handle <think> blocks (DeepSeek R1 reasoning)
                         if '<think>' in message_chunk:
                             in_think_block = True
 
                         if in_think_block:
                             if '</think>' in message_chunk:
                                 in_think_block = False
-                                status.update("[bold cyan]Processing...[/bold cyan]")
+                                status.update("[cyan]Processing...[/cyan]")
                             else:
-                                status.update("[bold yellow]💭 Thinking...[/bold yellow]")
+                                status.update("[yellow]Thinking...[/yellow]")
                             continue
 
-                        # First real content token — stop spinner, print header
                         if not response_started:
                             response_started = True
                             status.stop()
-                            console.print(Panel.fit(
-                                "",
-                                title="[bold magenta]ChatATP[/bold magenta]",
-                                border_style="magenta",
-                                padding=(0, 1)
-                            ))
+                            console.print(
+                                f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
+                            )
 
                         console.print(message_chunk, end='', highlight=False)
                         full_response += message_chunk
@@ -338,19 +332,18 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                     if chunk.get('is_typing') == False:
                         break
 
-        # Final newline + separator
         if response_started:
             console.print()
-            console.print("[dim]─────────────────────────────────[/dim]")
+            console.print("\n[dim]─────────────────────────────────[/dim]")
         elif chunk_count == 0:
-            console.print("[red]✗ No data received — check api_client stream parsing.[/red]")
+            console.print("[red]No data received.[/red]")
         else:
-            console.print(f"[yellow]⚠ Received {chunk_count} chunks but no message content.[/yellow]")
+            console.print(f"[yellow]No message content in {chunk_count} chunks.[/yellow]")
             if not debug:
-                console.print("[dim]Tip: Run with --debug to inspect raw chunks.[/dim]")
+                console.print("[dim]Run with --debug to inspect.[/dim]")
 
     except Exception as e:
-        console.print(f"[red]✗ Error: {e}[/red]")
+        console.print(f"[red]Error: {e}[/red]")
         if debug:
             import traceback
             traceback.print_exc()
