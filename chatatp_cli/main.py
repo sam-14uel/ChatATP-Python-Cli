@@ -704,6 +704,36 @@ def settings():
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
+# MCP commands
+@cli.group()
+def mcp():
+    """MCP management"""
+    pass
+
+@mcp.command()
+def connections():
+    """List MCP connections"""
+    check_auth()
+    try:
+        with console.status("[bold green]Fetching MCP connections..."):
+            data = api.list_mcp_connections()
+
+        console.print(format_json(data))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+@mcp.command()
+def servers():
+    """List MCP servers"""
+    check_auth()
+    try:
+        with console.status("[bold green]Fetching MCP servers..."):
+            data = api.list_mcp_servers()
+
+        console.print(format_json(data))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
 # Store commands
 @cli.group()
 def store():
@@ -751,6 +781,32 @@ def popular():
         table.add_column("Installs", style="green")
 
         for toolkit in data['popular_toolkits']:
+            table.add_row(
+                toolkit['name'],
+                toolkit['display_name'],
+                toolkit['category'],
+                str(toolkit['installs'])
+            )
+
+        console.print(table)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+@store.command()
+def recommended():
+    """List recommended toolkits"""
+    check_auth()
+    try:
+        with console.status("[bold green]Fetching recommended toolkits..."):
+            data = api.list_recommended_toolkits()
+
+        table = Table(title="Recommended Toolkits")
+        table.add_column("Name", style="cyan")
+        table.add_column("Display Name", style="magenta")
+        table.add_column("Category", style="white")
+        table.add_column("Installs", style="green")
+
+        for toolkit in data['recommended']:
             table.add_row(
                 toolkit['name'],
                 toolkit['display_name'],

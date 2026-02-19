@@ -24,7 +24,7 @@ A powerful terminal interface for the ChatATP API, built with Python. Interact w
 - **Integration Management**: Manage OAuth and custom integrations
 - **AI Configuration**: Configure AI providers, models, and settings
 - **Media Management**: Browse and manage uploaded media files
-- **Store Access**: Browse featured and popular toolkits
+- **Store Access**: Browse featured, popular, and recommended toolkits
 - **MCP Support**: Manage MCP servers and connections
 
 ## Installation
@@ -196,6 +196,9 @@ chatatp store featured
 
 # Browse popular toolkits
 chatatp store popular
+
+# Browse recommended toolkits
+chatatp store recommended
 ```
 
 ### Integrations
@@ -206,6 +209,16 @@ chatatp integrations list
 
 # List custom integrations
 chatatp integrations custom
+```
+
+### MCP Management
+
+```bash
+# List MCP connections
+chatatp mcp connections
+
+# List MCP servers
+chatatp mcp servers
 ```
 
 ### AI Management
