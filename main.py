@@ -210,13 +210,187 @@ def show(room_id):
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
+def chat_loop(room_id, initial_message=None, model=None, toolkits=None, mcp_connections=None):
+    """Interactive chat loop for back-and-forth conversation"""
+    console.print(f"\n[bold cyan]Entered chatroom: {room_id}[/bold cyan]")
+    console.print("[dim]Type your message or '/exit' to quit, '/help' for commands[/dim]\n")
+
+    # Send initial message if provided
+    if initial_message:
+        console.print(f"[bold green]You:[/bold green] {initial_message}")
+        send_single_message(room_id, initial_message, model, toolkits, mcp_connections)
+
+    while True:
+        try:
+            # Get user input
+            user_input = console.input("[bold green]You:[/bold green] ").strip()
+
+            if not user_input:
+                continue
+
+            # Handle commands
+            if user_input.lower() in ['/exit', '/quit', '/q']:
+                console.print("[yellow]Exiting chat...[/yellow]")
+                break
+            elif user_input.lower() in ['/help', '/h']:
+                console.print("\n[bold]Available commands:[/bold]")
+                console.print("  /exit, /quit, /q  - Exit the chat")
+                console.print("  /help, /h         - Show this help")
+                console.print("  /clear             - Clear the screen")
+                console.print("  /history           - Show chat history")
+                console.print()
+                continue
+            elif user_input.lower() == '/clear':
+                console.clear()
+                console.print(f"[bold cyan]Chatroom: {room_id}[/bold cyan]")
+                console.print("[dim]Type your message or '/exit' to quit[/dim]\n")
+                continue
+            elif user_input.lower() == '/history':
+                try:
+                    with console.status("[bold cyan]Loading history...[/bold cyan]"):
+                        data = api.get_chatroom(room_id)
+                    if data.get('chats'):
+                        console.print("\n[bold]Recent messages:[/bold]")
+                        for chat in data['chats'][-10:]:  # Last 10 messages
+                            sender = chat['sender_account']['user']['first_name']
+                            time = chat['created'][:19]
+                            message = chat['text'][:100] + "..." if len(chat['text']) > 100 else chat['text']
+                            if sender == "ChatATP":
+                                console.print(f"[cyan]{time}[/cyan] [magenta]{sender}:[/magenta] {message}")
+                            else:
+                                console.print(f"[cyan]{time}[/cyan] [green]{sender}:[/green] {message}")
+                        console.print()
+                    else:
+                        console.print("[yellow]No chat history found.[/yellow]\n")
+                except Exception as e:
+                    console.print(f"[red]Error loading history: {e}[/red]\n")
+                continue
+
+            # Send the message
+            send_single_message(room_id, user_input, model, toolkits, mcp_connections)
+
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Interrupted. Use '/exit' to quit properly.[/yellow]")
+        except EOFError:
+            console.print("\n[yellow]EOF received. Exiting...[/yellow]")
+            break
+
+def send_single_message(room_id, message, model=None, toolkits=None, mcp_connections=None, debug=False):
+    """Send a single message and handle the streaming response"""
+    try:
+        full_response = ""
+        in_think_block = False
+        chunk_count = 0
+        response_started = False
+        tool_lines = []
+
+        with console.status("[bold cyan]Sending...[/bold cyan]", spinner="dots") as status:
+
+            for chunk in api.send_chat_message_stream(
+                room_id=room_id,
+                message=message,
+                model=model,
+                toolkit_ids=list(toolkits) if toolkits else None,
+                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
+            ):
+                chunk_count += 1
+
+                if debug:
+                    console.print(f"[dim]CHUNK #{chunk_count}: {chunk}[/dim]")
+
+                msg_type = chunk.get('message_type', '')
+
+                # ── tool_call ──────────────────────────────────────────────
+                if msg_type == 'tool_call':
+                    tool      = chunk.get('tool', {})
+                    tool_name = tool.get('name') or chunk.get('toolkit_name') or 'tool'
+                    toolkit   = chunk.get('toolkit_name', '')
+                    args      = tool.get('arguments', {})
+
+                    arg_hint = ''
+                    if args:
+                        first_val = next(iter(args.values()), None)
+                        if first_val and isinstance(first_val, str) and len(first_val) < 60:
+                            arg_hint = f' [dim]"{first_val}"[/dim]'
+
+                    # Print a running line — no emoji, clean mono style
+                    console.print(
+                        f"\n  [dim]┌[/dim] [bold white]{tool_name}[/bold white]"
+                        f"[dim] · {toolkit}{arg_hint}[/dim]"
+                    )
+                    status.update(
+                        f"[cyan]Running [bold]{tool_name}[/bold]...[/cyan]"
+                    )
+
+                # ── tool_result ────────────────────────────────────────────
+                elif msg_type == 'tool_result':
+                    executions = chunk.get('timing_metrics', {}).get('tool_executions', [])
+                    if executions:
+                        last      = executions[-1]
+                        tool_name = last.get('tool_name', 'tool')
+                        duration  = last.get('execution_duration', 0)
+                        ok        = last.get('status', 'success') == 'success'
+                        mark      = '[bold green]done[/bold green]' if ok else '[bold red]failed[/bold red]'
+                        console.print(
+                            f"  [dim]└[/dim] {mark} [dim]{duration:.2f}s[/dim]"
+                        )
+                    else:
+                        console.print(f"  [dim]└[/dim] [bold green]done[/bold green]")
+
+                    status.update("[cyan]Processing...[/cyan]")
+
+                # ── chat_message ───────────────────────────────────────────
+                elif msg_type == 'chat_message':
+                    message_chunk = chunk.get('message', '')
+
+                    if message_chunk:
+                        if '<think>' in message_chunk:
+                            in_think_block = True
+
+                        if in_think_block:
+                            if '</think>' in message_chunk:
+                                in_think_block = False
+                                status.update("[cyan]Processing...[/cyan]")
+                            else:
+                                status.update("[yellow]Thinking...[/yellow]")
+                            continue
+
+                        if not response_started:
+                            response_started = True
+                            status.stop()
+                            console.print(
+                                f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
+                            )
+
+                        console.print(message_chunk, end='', highlight=False)
+                        full_response += message_chunk
+
+                    if chunk.get('is_typing') == False:
+                        break
+
+        if response_started:
+            console.print()
+            console.print("\n[dim]─────────────────────────────────[/dim]")
+        elif chunk_count == 0:
+            console.print("[red]No data received.[/red]")
+        else:
+            console.print(f"[yellow]No message content in {chunk_count} chunks.[/yellow]")
+            if not debug:
+                console.print("[dim]Run with --debug to inspect.[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        if debug:
+            import traceback
+            traceback.print_exc()
+
 @chat.command()
 @click.argument('message')
 @click.option('--model', default=None, help='Model to use')
 @click.option('--toolkits', multiple=True, help='Toolkit IDs to use')
 @click.option('--mcp-connections', multiple=True, help='MCP connection IDs to use')
 def new(message, model, toolkits, mcp_connections):
-    """Create new chatroom"""
+    """Create new chatroom and start interactive chat"""
     check_auth()
     try:
         with console.status("[bold green]Creating chatroom..."):
@@ -227,9 +401,33 @@ def new(message, model, toolkits, mcp_connections):
                 mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
             )
 
-        console.print(f"[green]Chatroom created: {data['room_id']}[/green]")
+        room_id = data['room_id']
+        console.print(f"[green]Chatroom created: {room_id}[/green]")
+
+        # Start the interactive chat loop
+        chat_loop(room_id, initial_message=message, model=model, toolkits=toolkits, mcp_connections=mcp_connections)
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+
+@chat.command()
+@click.argument('room_id')
+@click.option('--model', default=None, help='Model to use')
+@click.option('--toolkits', multiple=True, help='Toolkit IDs to use')
+@click.option('--mcp-connections', multiple=True, help='MCP connection IDs to use')
+def converse(room_id, model, toolkits, mcp_connections):
+    """Enter existing chatroom for interactive chat"""
+    check_auth()
+    try:
+        # Verify the room exists
+        with console.status("[bold cyan]Entering chatroom...[/bold cyan]"):
+            data = api.get_chatroom(room_id)
+
+        # Start the interactive chat loop
+        chat_loop(room_id, initial_message=None, model=model, toolkits=toolkits, mcp_connections=mcp_connections)
+
+    except Exception as e:
+        console.print(f"[red]Error entering chatroom: {e}[/red]")
 
 @chat.command()
 @click.argument('room_id')

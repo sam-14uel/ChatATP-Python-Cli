@@ -2,11 +2,24 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
+## ✨ What's New (v2.0)
+
+### 🚀 Agentic Loop Support
+- **Interactive Conversations**: Back-and-forth chat with persistent context
+- **Real-time Streaming**: Responses appear as they're generated with tool call visualization
+- **Auto-enter Chatrooms**: `chat new` now creates AND enters chat automatically
+- **In-chat Commands**: Rich command system during conversations (`/exit`, `/help`, `/clear`, `/history`)
+
+### 🔄 Chat Evolution
+- **Before**: One-shot messages that exit immediately
+- **Now**: Persistent interactive sessions with agentic conversations
+- **Streaming**: Tool calls, thinking blocks, and responses all visualized in real-time
+
 ## Features
 
 - **Account Management**: View your ChatATP account information
 - **Model Management**: List and manage AI models
-- **Chat Interface**: Create chatrooms and send messages with streaming responses
+- **Interactive Chat**: Agentic loop support with back-and-forth conversations
 - **Toolkit Management**: Browse and manage your toolkits and collections
 - **Integration Management**: Manage OAuth and custom integrations
 - **AI Configuration**: Configure AI providers, models, and settings
@@ -72,23 +85,96 @@ python main.py models
 python main.py ai provider-models PROVIDER_ID
 ```
 
-### Chat Management
+## 🎯 Interactive Chat System
 
+The ChatATP CLI now supports **true agentic conversations** with persistent context, just like chatting with ChatGPT or Claude!
+
+### New Interactive Commands
+
+#### **Start New Interactive Chat**
+```bash
+python main.py chat new "Tell me about machine learning"
+```
+- Creates a new chatroom
+- Automatically enters interactive mode
+- Sends your initial message
+- Starts back-and-forth conversation loop
+
+#### **Enter Existing Chatroom**
+```bash
+python main.py chat converse ROOM_ID
+```
+- Enter any existing chatroom for interactive chat
+- Continue conversations where you left off
+- Same interactive experience as new chats
+
+### In-Chat Commands
+
+While in interactive mode, you have access to these commands:
+
+- **`/exit`**, **`/quit`**, **`/q`** - Exit the current chat session
+- **`/help`**, **`/h`** - Show available commands
+- **`/clear`** - Clear the screen and show current chat info
+- **`/history`** - Show recent messages from chat history
+
+### Interactive Chat Flow
+
+```
+$ python main.py chat new "Hello, let's discuss AI"
+
+Chatroom created: abc123
+Entered chatroom: abc123
+Type your message or '/exit' to quit, '/help' for commands
+
+You: Hello, let's discuss AI
+
+ChatATP ·
+
+Hello! I'd be happy to discuss AI with you. What specific aspects of artificial intelligence are you interested in? Whether it's machine learning algorithms, current trends, ethical considerations, or practical applications, I'm here to help!
+
+─────────────────────────────────
+You: Tell me about neural networks
+
+ChatATP ·
+
+Neural networks are fascinating! Let me explain them step by step:
+
+A neural network is a computational model inspired by the human brain's neural structure. It consists of interconnected nodes (neurons) organized in layers...
+
+─────────────────────────────────
+You: /help
+
+Available commands:
+  /exit, /quit, /q  - Exit the chat
+  /help, /h         - Show this help
+  /clear             - Clear the screen
+  /history           - Show chat history
+
+You: /exit
+Exiting chat...
+```
+
+### Legacy Commands (Still Supported)
+
+#### **One-shot Message Sending**
+```bash
+# Send single message (legacy - exits immediately)
+python main.py chat send ROOM_ID "Your message here"
+
+# Send with specific model and toolkits
+python main.py chat send ROOM_ID "Analyze this data" --model gpt-oss-120b --toolkits TOOLKIT_ID1 TOOLKIT_ID2
+
+# Debug mode to see raw chunks
+python main.py chat send ROOM_ID "Debug message" --debug
+```
+
+#### **Chatroom Management**
 ```bash
 # List your chatrooms
 python main.py chat rooms
 
 # Show details of a specific chatroom
 python main.py chat show ROOM_ID
-
-# Create a new chatroom
-python main.py chat new "Hello, how are you?"
-
-# Send a message to a chatroom
-python main.py chat send ROOM_ID "Your message here"
-
-# Send message with specific model and toolkits
-python main.py chat send ROOM_ID "Analyze this data" --model gpt-oss-120b --toolkits TOOLKIT_ID1 TOOLKIT_ID2
 ```
 
 ### Toolkits
@@ -160,6 +246,43 @@ python main.py config set-token YOUR_TOKEN
 
 The token will be stored securely in your home directory under `~/.chatatp/config.yaml`.
 
+## Advanced Features
+
+### Real-time Streaming with Tool Visualization
+
+The CLI now provides rich visualization of:
+
+- **Tool Calls**: See when tools are being executed with timing
+- **Thinking Blocks**: Visual indicators when AI is reasoning
+- **Progress Indicators**: Spinners and status updates during processing
+- **Error Handling**: Graceful handling of network issues and API errors
+
+### Example with Tool Calls
+
+```
+You: Search for information about OpenClaw AI
+
+ChatATP ·
+
+I need to search for information about OpenClaw AI. Let me use the search tool.
+
+  ┌ search_web · web_search_toolkit
+  └ done 0.34s
+
+Based on my search, OpenClaw is...
+```
+
+### Interactive vs One-shot Mode Comparison
+
+| Feature | Interactive Mode (`chat new/converse`) | One-shot Mode (`chat send`) |
+|---------|----------------------------------------|----------------------------|
+| **Persistence** | ✅ Back-and-forth conversation | ❌ Single message only |
+| **Context** | ✅ Full conversation history | ❌ No context retention |
+| **Commands** | ✅ Rich in-chat commands | ❌ None |
+| **Tool Visualization** | ✅ Real-time with progress | ✅ Basic streaming |
+| **Exit Behavior** | Manual exit with `/exit` | Auto-exit after response |
+| **Use Case** | Deep conversations, exploration | Quick questions, automation |
+
 ## Error Handling
 
 The CLI provides clear error messages for common issues:
@@ -167,18 +290,39 @@ The CLI provides clear error messages for common issues:
 - Invalid room IDs
 - Network errors
 - Authentication failures
-
-## Streaming Chat
-
-Chat responses are streamed in real-time for a smooth conversational experience. The CLI will display responses as they arrive from the ChatATP API.
+- Streaming interruptions
 
 ## Dependencies
 
 - requests: HTTP client
 - click: Command line interface
-- rich: Beautiful terminal output
+- rich: Beautiful terminal output with progress indicators
 - pyyaml: Configuration file handling
 - python-dotenv: Environment variable support
+
+## Migration Guide
+
+### From v1.x to v2.0
+
+**Old workflow:**
+```bash
+# Create room
+python main.py chat new "Hello"
+# Copy room ID
+# Send messages one by one
+python main.py chat send ROOM_ID "Follow up question"
+python main.py chat send ROOM_ID "Another question"
+```
+
+**New workflow:**
+```bash
+# Single command starts interactive session
+python main.py chat new "Hello, let's have a conversation"
+# Now chat back and forth naturally!
+# Type /exit when done
+```
+
+**Legacy commands still work:** All v1.x commands (`chat send`, etc.) remain fully functional for scripts and automation.
 
 ## Contributing
 
