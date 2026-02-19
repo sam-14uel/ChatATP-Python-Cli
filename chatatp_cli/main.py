@@ -43,10 +43,13 @@ def print_banner(ctx):
     """
     console.print(banner, style="bold cyan")
 
+@click.option('--version', is_flag=True, help='Show version')
 @click.group(callback=print_banner)
-@click.version_option(version="1.0.2")
-def cli():
+def cli(version):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
+    if version:
+        console.print("ChatATP CLI v1.0.3")
+        sys.exit(0)
     pass
 
 # Configuration commands
