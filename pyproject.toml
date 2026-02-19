@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatatp-cli"
+version = "1.0.0"
+description = "ChatATP CLI - Terminal Interface for ChatATP API"
+authors = [
+    { name = "ChatATP Team", email = "support@chatatp.com" }
+]
+
+dependencies = [
+    "requests",
+    "click",
+    "rich",
+    "pyyaml",
+    "python-dotenv",
+]
+
+[project.scripts]
+chatatp = "chatatp_cli.main:cli"
+
+[project.urls]
+Homepage = "https://chat-atp.com"
+Documentation = "https://docs.chat-atp.com"
+Repository = "https://github.com/sam-14uel/ChatATP-Python-Cli"
+Issues = "https://github.com/sam-14uel/ChatATP-Python-Cli/issues"
+

@@ -2,7 +2,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v2.0)
+## ✨ What's New (v1.0.0)
 
 ### 🚀 Agentic Loop Support
 - **Interactive Conversations**: Back-and-forth chat with persistent context
@@ -28,6 +28,14 @@ A powerful terminal interface for the ChatATP API, built with Python. Interact w
 - **MCP Support**: Manage MCP servers and connections
 
 ## Installation
+
+### From PyPI (Recommended)
+
+```bash
+pip install chatatp-cli
+```
+
+### From Source
 
 1. Clone or download this repository
 2. Install dependencies:

@@ -13,8 +13,9 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.live import Live
 from rich.spinner import Spinner
-from config import Config
-from api_client import ChatATPAPI
+from rich.markdown import Markdown
+from .config import Config
+from .api_client import ChatATPAPI
 
 console = Console()
 config_manager = Config()
@@ -362,14 +363,13 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                                 f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
                             )
 
-                        console.print(message_chunk, end='', highlight=False)
                         full_response += message_chunk
 
                     if chunk.get('is_typing') == False:
                         break
 
         if response_started:
-            console.print()
+            console.print(Markdown(full_response))
             console.print("\n[dim]─────────────────────────────────[/dim]")
         elif chunk_count == 0:
             console.print("[red]No data received.[/red]")
@@ -524,14 +524,13 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                                 f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
                             )
 
-                        console.print(message_chunk, end='', highlight=False)
                         full_response += message_chunk
 
                     if chunk.get('is_typing') == False:
                         break
 
         if response_started:
-            console.print()
+            console.print(Markdown(full_response))
             console.print("\n[dim]─────────────────────────────────[/dim]")
         elif chunk_count == 0:
             console.print("[red]No data received.[/red]")
