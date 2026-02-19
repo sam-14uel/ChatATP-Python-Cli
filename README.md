@@ -2,7 +2,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.0.0)
+## ✨ What's New (v1.0.1)
 
 ### 🚀 Agentic Loop Support
 - **Interactive Conversations**: Back-and-forth chat with persistent context
@@ -53,20 +53,20 @@ pip install chatatp-cli
 Before using the CLI, you need to configure your API token:
 
 ```bash
-python main.py config set-token YOUR_API_TOKEN_HERE
+chatatp config set-token YOUR_API_TOKEN_HERE
 ```
 
 You can also configure other settings:
 
 ```bash
 # Set custom API base URL (default: https://api.chat-atp.com)
-python main.py config set-base-url https://your-custom-api-url.com
+chatatp config set-base-url https://your-custom-api-url.com
 
 # Set default model
-python main.py config set-default-model gpt-oss-120b
+chatatp config set-default-model gpt-oss-120b
 
 # View current configuration
-python main.py config show
+chatatp config show
 ```
 
 ## Usage
@@ -74,23 +74,23 @@ python main.py config show
 ### Getting Help
 
 ```bash
-python main.py --help
+chatatp --help
 ```
 
 ### Account Information
 
 ```bash
-python main.py account
+chatatp account
 ```
 
 ### Models
 
 ```bash
 # List available models
-python main.py models
+chatatp models
 
 # List models for a specific provider
-python main.py ai provider-models PROVIDER_ID
+chatatp ai provider-models PROVIDER_ID
 ```
 
 ## 🎯 Interactive Chat System
@@ -101,7 +101,7 @@ The ChatATP CLI now supports **true agentic conversations** with persistent cont
 
 #### **Start New Interactive Chat**
 ```bash
-python main.py chat new "Tell me about machine learning"
+chatatp chat new "Tell me about machine learning"
 ```
 - Creates a new chatroom
 - Automatically enters interactive mode
@@ -110,7 +110,7 @@ python main.py chat new "Tell me about machine learning"
 
 #### **Enter Existing Chatroom**
 ```bash
-python main.py chat converse ROOM_ID
+chatatp chat converse ROOM_ID
 ```
 - Enter any existing chatroom for interactive chat
 - Continue conversations where you left off
@@ -128,7 +128,7 @@ While in interactive mode, you have access to these commands:
 ### Interactive Chat Flow
 
 ```
-$ python main.py chat new "Hello, let's discuss AI"
+$ chatatp chat new "Hello, let's discuss AI"
 
 Chatroom created: abc123
 Entered chatroom: abc123
@@ -167,81 +167,81 @@ Exiting chat...
 #### **One-shot Message Sending**
 ```bash
 # Send single message (legacy - exits immediately)
-python main.py chat send ROOM_ID "Your message here"
+chatatp chat send ROOM_ID "Your message here"
 
 # Send with specific model and toolkits
-python main.py chat send ROOM_ID "Analyze this data" --model gpt-oss-120b --toolkits TOOLKIT_ID1 TOOLKIT_ID2
+chatatp chat send ROOM_ID "Analyze this data" --model gpt-oss-120b --toolkits TOOLKIT_ID1 TOOLKIT_ID2
 
 # Debug mode to see raw chunks
-python main.py chat send ROOM_ID "Debug message" --debug
+chatatp chat send ROOM_ID "Debug message" --debug
 ```
 
 #### **Chatroom Management**
 ```bash
 # List your chatrooms
-python main.py chat rooms
+chatatp chat rooms
 
 # Show details of a specific chatroom
-python main.py chat show ROOM_ID
+chatatp chat show ROOM_ID
 ```
 
 ### Toolkits
 
 ```bash
 # List your toolkits
-python main.py toolkits
+chatatp toolkits
 
 # Browse featured toolkits
-python main.py store featured
+chatatp store featured
 
 # Browse popular toolkits
-python main.py store popular
+chatatp store popular
 ```
 
 ### Integrations
 
 ```bash
 # List OAuth integrations
-python main.py integrations list
+chatatp integrations list
 
 # List custom integrations
-python main.py integrations custom
+chatatp integrations custom
 ```
 
 ### AI Management
 
 ```bash
 # List AI providers
-python main.py ai providers
+chatatp ai providers
 
 # List AI configurations
-python main.py ai configs
+chatatp ai configs
 
 # Show AI settings
-python main.py ai settings
+chatatp ai settings
 ```
 
 ### Media
 
 ```bash
 # List your media files
-python main.py media
+chatatp media
 
 # Search media
-python main.py media --search "document name"
+chatatp media --search "document name"
 
 # Filter by type
-python main.py media --type image
+chatatp media --type image
 
 # Pagination
-python main.py media --page 2 --page-size 20
+chatatp media --page 2 --page-size 20
 ```
 
 ### Pricing
 
 ```bash
 # View pricing plans
-python main.py pricing
+chatatp pricing
 ```
 
 ## Authentication
@@ -249,7 +249,7 @@ python main.py pricing
 All commands require authentication. Make sure you've set your API token using:
 
 ```bash
-python main.py config set-token YOUR_TOKEN
+chatatp config set-token YOUR_TOKEN
 ```
 
 The token will be stored securely in your home directory under `~/.chatatp/config.yaml`.
@@ -315,17 +315,17 @@ The CLI provides clear error messages for common issues:
 **Old workflow:**
 ```bash
 # Create room
-python main.py chat new "Hello"
+chatatp chat new "Hello"
 # Copy room ID
 # Send messages one by one
-python main.py chat send ROOM_ID "Follow up question"
-python main.py chat send ROOM_ID "Another question"
+chatatp chat send ROOM_ID "Follow up question"
+chatatp chat send ROOM_ID "Another question"
 ```
 
 **New workflow:**
 ```bash
 # Single command starts interactive session
-python main.py chat new "Hello, let's have a conversation"
+chatatp chat new "Hello, let's have a conversation"
 # Now chat back and forth naturally!
 # Type /exit when done
 ```

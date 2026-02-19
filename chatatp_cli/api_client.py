@@ -1,7 +1,7 @@
 import requests
 from typing import Dict, List, Optional, Any
 import json
-from config import Config
+from .config import Config
 
 class ChatATPAPI:
     def __init__(self, config: Config):
