@@ -31,8 +31,20 @@ def check_auth():
         console.print("[red]Error: No API token configured. Use 'chatatp config set-token <token>' to set it.[/red]")
         sys.exit(1)
 
-@click.group()
-@click.version_option(version="1.0.0")
+def print_banner(ctx):
+    """Print ASCII banner for ChatATP CLI"""
+    banner = """
+ ██████╗██╗  ██╗ █████╗ ████████╗ █████╗ ████████╗██████╗ 
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝██╔══██╗╚══██╔══╝██╔══██╗
+██║     ███████║███████║   ██║   ███████║   ██║   ██████╔╝
+██║     ██╔══██║██╔══██║   ██║   ██╔══██║   ██║   ██╔═══╝ 
+╚██████╗██║  ██║██║  ██║   ██║   ██║  ██║   ██║   ██║     
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝     
+    """
+    console.print(banner, style="bold cyan")
+
+@click.group(callback=print_banner)
+@click.version_option(version="1.0.2")
 def cli():
     """ChatATP CLI - Terminal Interface for ChatATP API"""
     pass
