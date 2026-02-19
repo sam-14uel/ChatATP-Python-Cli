@@ -44,7 +44,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.4", prog_name="ChatATP CLI")
+@click.version_option(version="1.0.5", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -734,7 +734,69 @@ def connections():
         with console.status("[bold green]Fetching MCP connections..."):
             data = api.list_mcp_connections()
 
-        console.print(format_json(data))
+        table = Table(title=f"MCP Connections ({data.get('count', 0)} total)")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Category", style="magenta")
+        table.add_column("Auth Type", style="yellow")
+        table.add_column("Status", style="green")
+        table.add_column("Last Used", style="white")
+        table.add_column("Expires", style="red")
+
+        for connection in data.get('connections', []):
+            server_details = connection.get('server_details', {})
+            name = server_details.get('name', 'Unknown')
+            category = server_details.get('category', 'N/A')
+            auth_type = server_details.get('auth_type', 'N/A')
+
+            status = connection.get('status', 'unknown')
+            status_display = {
+                'connected': '[green]Connected[/green]',
+                'disconnected': '[red]Disconnected[/red]',
+                'connecting': '[yellow]Connecting[/yellow]',
+                'error': '[red]Error[/red]'
+            }.get(status, f'[dim]{status}[/dim]')
+
+            last_used = connection.get('last_used')
+            if last_used:
+                last_used = last_used[:10]  # YYYY-MM-DD format
+            else:
+                last_used = "Never"
+
+            expires_at = connection.get('expires_at')
+            if expires_at:
+                expires_at = expires_at[:10]  # YYYY-MM-DD format
+                if connection.get('is_token_expired'):
+                    expires_at = f"[red]{expires_at} (expired)[/red]"
+                elif connection.get('requires_reconnect'):
+                    expires_at = f"[yellow]{expires_at} (reconnect)[/yellow]"
+                else:
+                    expires_at = f"[green]{expires_at}[/green]"
+            else:
+                expires_at = "[dim]Never[/dim]"
+
+            table.add_row(
+                name,
+                category or "[dim]N/A[/dim]",
+                auth_type,
+                status_display,
+                last_used,
+                expires_at
+            )
+
+        console.print(table)
+
+        # Show summary
+        connected_count = sum(1 for c in data.get('connections', []) if c.get('status') == 'connected')
+        expired_count = sum(1 for c in data.get('connections', []) if c.get('is_token_expired'))
+        reconnect_count = sum(1 for c in data.get('connections', []) if c.get('requires_reconnect'))
+
+        if expired_count > 0 or reconnect_count > 0:
+            console.print(f"\n[bold]Summary:[/bold] {connected_count} connected")
+            if expired_count > 0:
+                console.print(f"  [red]{expired_count} expired tokens[/red]")
+            if reconnect_count > 0:
+                console.print(f"  [yellow]{reconnect_count} need reconnection[/yellow]")
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -746,7 +808,43 @@ def servers():
         with console.status("[bold green]Fetching MCP servers..."):
             data = api.list_mcp_servers()
 
-        console.print(format_json(data))
+        table = Table(title=f"MCP Servers ({data.get('count', 0)} total)")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Category", style="magenta")
+        table.add_column("Type", style="yellow")
+        table.add_column("Auth", style="green")
+        table.add_column("Public", style="white")
+        table.add_column("URL", style="blue")
+
+        for server in data.get('servers', []):
+            name = server.get('name', 'Unknown')
+            category = server.get('category', 'N/A')
+            server_type = server.get('server_type', 'N/A')
+            auth_type = server.get('auth_type', 'N/A')
+            is_public = "[green]Yes[/green]" if server.get('is_public') else "[red]No[/red]"
+
+            url = server.get('server_url', 'N/A')
+            if url and len(url) > 40:
+                url = url[:37] + "..."
+
+            table.add_row(
+                name,
+                category or "[dim]N/A[/dim]",
+                server_type,
+                auth_type,
+                is_public,
+                url or "[dim]N/A[/dim]"
+            )
+
+        console.print(table)
+
+        # Show summary by type
+        custom_count = sum(1 for s in data.get('servers', []) if s.get('server_type') == 'custom')
+        prebuilt_count = sum(1 for s in data.get('servers', []) if s.get('server_type') == 'prebuilt')
+        public_count = sum(1 for s in data.get('servers', []) if s.get('is_public'))
+
+        console.print(f"\n[bold]Summary:[/bold] {custom_count} custom, {prebuilt_count} prebuilt, {public_count} public")
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 

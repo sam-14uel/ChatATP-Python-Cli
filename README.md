@@ -1,8 +1,17 @@
 # ChatATP CLI
 
+```text
+ ██████╗██╗  ██╗ █████╗ ████████╗ █████╗ ████████╗██████╗ 
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝██╔══██╗╚══██╔══╝██╔══██╗
+██║     ███████║███████║   ██║   ███████║   ██║   ██████╔╝
+██║     ██╔══██║██╔══██║   ██║   ██╔══██║   ██║   ██╔═══╝ 
+╚██████╗██║  ██║██║  ██║   ██║   ██║  ██║   ██║   ██║     
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝     
+```
+
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.0.4)
+## ✨ What's New (v1.0.5)
 
 ### 🚀 Agentic Loop Support
 - **Interactive Conversations**: Back-and-forth chat with persistent context
@@ -47,6 +56,26 @@ pip install chatatp-cli
    ```bash
    chmod +x main.py
    ```
+
+## Quick Start
+
+When you run the CLI, you'll see the beautiful ASCII banner:
+
+```text
+ ██████╗██╗  ██╗ █████╗ ████████╗ █████╗ ████████╗██████╗ 
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝██╔══██╗╚══██╔══╝██╔══██╗
+██║     ███████║███████║   ██║   ███████║   ██║   ██████╔╝
+██║     ██╔══██║██╔══██║   ██║   ██╔══██║   ██║   ██╔═══╝ 
+╚██████╗██║  ██║██║  ██║   ██║   ██║  ██║   ██║   ██║     
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝     
+```
+
+Then get help with:
+
+```bash
+chatatp --help
+# or
+python main.py --help
 
 ## Configuration
 
