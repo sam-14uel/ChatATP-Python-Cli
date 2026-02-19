@@ -31,7 +31,7 @@ def check_auth():
         console.print("[red]Error: No API token configured. Use 'chatatp config set-token <token>' to set it.[/red]")
         sys.exit(1)
 
-def print_banner(ctx):
+def print_banner():
     """Print ASCII banner for ChatATP CLI"""
     banner = """
  ██████╗██╗  ██╗ █████╗ ████████╗ █████╗ ████████╗██████╗ 
@@ -40,17 +40,18 @@ def print_banner(ctx):
 ██║     ██╔══██║██╔══██║   ██║   ██╔══██║   ██║   ██╔═══╝ 
 ╚██████╗██║  ██║██║  ██║   ██║   ██║  ██║   ██║   ██║     
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝     
-    """
+"""
     console.print(banner, style="bold cyan")
 
-@click.option('--version', is_flag=True, help='Show version')
-@click.group(callback=print_banner)
-def cli(version):
+@click.group(invoke_without_command=True)
+@click.version_option(version="1.0.4", prog_name="ChatATP CLI")
+@click.pass_context
+def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
-    if version:
-        console.print("ChatATP CLI v1.0.3")
-        sys.exit(0)
-    pass
+    print_banner()
+    # If no subcommand was given, show help
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
 
 # Configuration commands
 @cli.group()
