@@ -3,3 +3,5 @@ click
 rich
 pyyaml
 python-dotenv
+build
+twine
