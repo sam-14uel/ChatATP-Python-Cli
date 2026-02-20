@@ -57,6 +57,24 @@ class Config:
         self._config['default_model'] = value
         self.save_config()
 
+    @property
+    def notifications_enabled(self) -> bool:
+        return self._config.get('notifications_enabled', True)
+
+    @notifications_enabled.setter
+    def notifications_enabled(self, value: bool):
+        self._config['notifications_enabled'] = value
+        self.save_config()
+
+    @property
+    def sound_enabled(self) -> bool:
+        return self._config.get('sound_enabled', True)
+
+    @sound_enabled.setter
+    def sound_enabled(self, value: bool):
+        self._config['sound_enabled'] = value
+        self.save_config()
+
     def get_headers(self) -> dict:
         """Get headers for API requests"""
         headers = {

@@ -11,7 +11,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.0.5)
+## ✨ What's New (v1.0.6)
 
 ### 🚀 Agentic Loop Support
 - **Interactive Conversations**: Back-and-forth chat with persistent context
@@ -97,6 +97,77 @@ chatatp config set-default-model gpt-oss-120b
 # View current configuration
 chatatp config show
 ```
+
+## 🔔 Desktop Notifications
+
+The ChatATP CLI now supports **cross-platform desktop notifications** with sound alerts! Get notified when AI starts responding, without keeping your terminal window focused.
+
+### ✅ Cross-Platform Support
+
+Works on **any operating system**:
+- **Windows**: Native toast notifications + system sounds
+- **macOS**: Native notifications + system sounds  
+- **Linux**: System tray notifications + audio playback
+- **Fallback**: System bell on unsupported systems
+
+### 🔊 Notification Triggers
+
+- **🤖 AI Response Start**: Desktop notification when AI begins typing/responding
+- **🔧 Tool Completion**: Optional notifications for tool execution results
+- **❌ Error Alerts**: Sound notifications for connection issues
+
+### ⚙️ Configuration
+
+```bash
+# Enable desktop notifications
+chatatp config enable-notifications
+
+# Disable desktop notifications  
+chatatp config disable-notifications
+
+# Enable sound alerts (with notifications)
+chatatp config enable-sound
+
+# Disable sound alerts
+chatatp config disable-sound
+```
+
+### 📱 Notification Experience
+
+When chatting interactively:
+
+```bash
+$ chatatp chat new "Tell me about AI"
+
+Chatroom created: abc123
+Entered chatroom: abc123
+Type your message or '/exit' to quit, '/help' for commands
+
+You: Tell me about AI
+
+# 🔔 Desktop notification appears: "ChatATP is thinking..."
+# 🔊 Sound plays (if enabled)
+# 💻 Terminal shows response as it streams
+
+ChatATP ·
+
+AI, or Artificial Intelligence, refers to the simulation of human intelligence...
+```
+
+### 🔇 Privacy & Control
+
+- **Opt-in by default**: Notifications disabled until you enable them
+- **Sound optional**: Enable notifications without sound, or both together
+- **Non-intrusive**: Only triggers on AI responses, not every message
+- **Cross-platform**: Same experience regardless of your OS
+
+### 🛠️ Technical Details
+
+- Uses `plyer` library for cross-platform compatibility
+- Sound support via system audio (Windows/macOS/Linux)
+- Fallback to terminal bell if audio unavailable
+- No external dependencies for basic notifications
+- Configuration persists across sessions
 
 ## Usage
 
@@ -194,6 +265,7 @@ Exiting chat...
 ### Legacy Commands (Still Supported)
 
 #### **One-shot Message Sending**
+
 ```bash
 # Send single message (legacy - exits immediately)
 chatatp chat send ROOM_ID "Your message here"
@@ -206,6 +278,7 @@ chatatp chat send ROOM_ID "Debug message" --debug
 ```
 
 #### **Chatroom Management**
+
 ```bash
 # List your chatrooms
 chatatp chat rooms
@@ -250,7 +323,183 @@ chatatp mcp connections
 chatatp mcp servers
 ```
 
-### AI Management
+### 🔧 Local MCP Client
+
+ChatATP CLI now includes a **built-in MCP (Model Context Protocol) client** that can directly connect to local MCP servers configured in standard config files. This allows you to use MCP tools, resources, and prompts directly from your terminal without going through the ChatATP API.
+
+### 📁 Supported Configuration Files
+
+The MCP client automatically discovers and loads configurations from:
+
+- `~/mcp.json` - Standard MCP configuration
+- `~/mcp_config.json` - Alternative config format
+- `~/.chatatp/mcp.json` - ChatATP-specific config
+- `~/Library/Application Support/Claude/claude_desktop_config.json` - macOS Claude config
+- `~/AppData/Roaming/Claude/claude_desktop_config.json` - Windows Claude config
+
+### 📋 Configuration Format
+
+Create an `mcp.json` file in your home directory:
+
+```json
+{
+  "context7": {
+    "command": "npx",
+    "args": ["-y", "@upstash/context7-mcp@latest"]
+  },
+  "tavily-search": {
+    "command": "npx",
+    "args": ["-y", "tavily-mcp@0.1.2"],
+    "env": {
+      "TAVILY_API_KEY": "your-api-key-here"
+    }
+  },
+  "my-custom-server": {
+    "command": "python",
+    "args": ["-m", "my_mcp_server"],
+    "env": {
+      "CUSTOM_ENV_VAR": "value"
+    }
+  }
+}
+```
+
+### 🚀 Local MCP Commands
+
+#### **List Configured Servers**
+
+```bash
+chatatp mcp local-servers
+```
+
+#### **Connect to a Server**
+
+```bash
+chatatp mcp local-connect context7
+```
+
+Shows server capabilities, version info, and available features.
+
+#### **List Available Tools**
+
+```bash
+chatatp mcp local-tools context7
+```
+
+#### **Call a Tool**
+
+```bash
+# Call a tool with JSON arguments
+chatatp mcp local-call-tool context7 search_web --args '{"query": "latest AI news"}'
+
+# Call without arguments
+chatatp mcp local-call-tool context7 get_weather --args '{}'
+```
+
+#### **List Resources**
+
+```bash
+chatatp mcp local-resources context7
+```
+
+#### **Read a Resource**
+
+```bash
+chatatp mcp local-read-resource context7 file:///path/to/resource
+```
+
+#### **List Prompts**
+
+```bash
+chatatp mcp local-prompts context7
+```
+
+### 💡 Example Usage
+
+```bash
+# First, create a config file
+echo '{
+  "context7": {
+    "command": "npx",
+    "args": ["-y", "@upstash/context7-mcp@latest"]
+  }
+}' > ~/mcp.json
+
+# List configured servers
+$ chatatp mcp local-servers
+
+Local MCP Servers (1 configured)
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name       ┃ Command    ┃ Transport  ┃ URL/Args                     ┃
+├────────────┼────────────┼────────────┼─────────────────────────────┤
+┃ context7   ┃ npx        ┃ STDIO      ┃ -y @upstash/context7-mcp@latest ┃
+└────────────┴────────────┴────────────┴─────────────────────────────┘
+
+# Connect and explore
+$ chatatp mcp local-connect context7
+
+Connected to context7
+─────────────────────
+Server: Context7 MCP Server
+Version: 1.0.0
+Title: Context7
+Capabilities:
+  • tools: ✓
+  • resources: ✗
+  • prompts: ✗
+  • experimental: ✗
+  • completions: ✗
+  • streaming: ✗
+
+# List tools
+$ chatatp mcp local-tools context7
+
+Tools on context7
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name                          ┃ Title                          ┃ Description                   ┃
+├───────────────────────────────┼────────────────────────────────┼───────────────────────────────┤
+┃ search_web                    ┃ Web Search                     ┃ Search the web for information ┃
+┃ get_page_content              ┃ Get Page Content              ┃ Get content from a web page   ┃
+└───────────────────────────────┴────────────────────────────────┴───────────────────────────────┘
+
+# Call a tool
+$ chatatp mcp local-call-tool context7 search_web --args '{"query": "latest AI developments"}'
+
+Tool executed successfully
+Content:
+# AI Developments 2024
+
+Recent advancements in artificial intelligence include...
+
+[Results continue...]
+```
+
+### 🔧 Transport Types
+
+The MCP client supports all standard MCP transport types:
+
+- **STDIO**: Command-line tools that communicate via stdin/stdout
+- **HTTP**: Web-based MCP servers
+- **SSE**: Server-sent events for streaming responses
+
+### 🛡️ Security & Isolation
+
+- **No API Keys Required**: Direct local connections to your MCP servers
+- **Environment Variables**: Securely pass credentials via `env` config
+- **Process Isolation**: Each MCP server runs in its own process
+- **No Data Leakage**: All communication stays local unless using remote servers
+
+### 🔗 Integration with ChatATP
+
+While the local MCP client works independently, you can also use MCP connections through ChatATP's API for cloud-hosted MCP servers. The local client provides direct access for local development and testing.
+
+### 🐛 Troubleshooting
+
+**Server not found**: Ensure your config file exists and is properly formatted
+**Connection failed**: Check that the MCP server command is installed and available
+**Tool errors**: Verify tool arguments match the expected schema from `local-tools`
+
+## AI Management
 
 ```bash
 # List AI providers

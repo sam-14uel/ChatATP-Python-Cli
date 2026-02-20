@@ -5,3 +5,5 @@ pyyaml
 python-dotenv
 build
 twine
+plyer
+fastmcp

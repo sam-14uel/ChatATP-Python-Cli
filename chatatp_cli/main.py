@@ -16,10 +16,17 @@ from rich.spinner import Spinner
 from rich.markdown import Markdown
 from .config import Config
 from .api_client import ChatATPAPI
+from .notifications import notification_manager
+from .mcp_client import mcp_client_manager
+import asyncio
 
 console = Console()
 config_manager = Config()
 api = ChatATPAPI(config_manager)
+
+# Initialize notification manager with config settings
+notification_manager.enabled = config_manager.notifications_enabled
+notification_manager._sound_enabled = config_manager.sound_enabled
 
 def format_json(data) -> str:
     """Format JSON data for display"""
@@ -44,7 +51,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.5", prog_name="ChatATP CLI")
+@click.version_option(version="1.0.6", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -92,6 +99,34 @@ def show():
     table.add_row("Default Model", config_manager.default_model)
 
     console.print(table)
+
+@config.command()
+def enable_notifications():
+    """Enable desktop notifications"""
+    config_manager.notifications_enabled = True
+    notification_manager.enable_notifications()
+    console.print("[green]Desktop notifications enabled![/green]")
+
+@config.command()
+def disable_notifications():
+    """Disable desktop notifications"""
+    config_manager.notifications_enabled = False
+    notification_manager.disable_notifications()
+    console.print("[yellow]Desktop notifications disabled.[/yellow]")
+
+@config.command()
+def enable_sound():
+    """Enable notification sounds"""
+    config_manager.sound_enabled = True
+    notification_manager.enable_sound()
+    console.print("[green]Notification sounds enabled![/green]")
+
+@config.command()
+def disable_sound():
+    """Disable notification sounds"""
+    config_manager.sound_enabled = False
+    notification_manager.disable_sound()
+    console.print("[yellow]Notification sounds disabled.[/yellow]")
 
 # Account commands
 @cli.command()
@@ -299,7 +334,7 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
         in_think_block = False
         chunk_count = 0
         response_started = False
-        tool_lines = []
+        tool_lines = []  # track printed tool lines to update them
 
         with console.status("[bold cyan]Sending...[/bold cyan]", spinner="dots") as status:
 
@@ -378,6 +413,9 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                             console.print(
                                 f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
                             )
+
+                            # Send notification when AI starts responding
+                            notification_manager.notify_ai_start(model)
 
                         full_response += message_chunk
 
@@ -847,6 +885,282 @@ def servers():
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+
+@mcp.command()
+def local_servers():
+    """List configured local MCP servers"""
+    try:
+        # Load server configurations
+        configs = mcp_client_manager.load_server_configs()
+
+        if not configs:
+            console.print("[yellow]No MCP server configurations found.[/yellow]")
+            console.print("Create a configuration file at one of these locations:")
+            console.print("  - ~/mcp.json")
+            console.print("  - ~/mcp_config.json")
+            console.print("  - ~/.chatatp/mcp.json")
+            console.print("  - ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)")
+            console.print("  - ~/AppData/Roaming/Claude/claude_desktop_config.json (Windows)")
+            return
+
+        table = Table(title=f"Local MCP Servers ({len(configs)} configured)")
+        table.add_column("Name", style="cyan", no_wrap=True)
+        table.add_column("Command", style="magenta")
+        table.add_column("Transport", style="yellow")
+        table.add_column("URL/Args", style="green")
+
+        for server_name, config in configs.items():
+            command = config.get('command', 'npx')
+            transport = config.get('transport', 'stdio').lower()
+
+            if transport in ['http', 'https', 'sse']:
+                url_args = config.get('url', 'N/A')
+            else:
+                args = config.get('args', [])
+                url_args = ' '.join(str(arg) for arg in args) if args else 'N/A'
+                if len(url_args) > 40:
+                    url_args = url_args[:37] + "..."
+
+            table.add_row(
+                server_name,
+                command,
+                transport.upper(),
+                url_args
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+def local_connect(server_name):
+    """Connect to a local MCP server"""
+    try:
+        async def _connect():
+            with console.status(f"[bold cyan]Connecting to {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                # Get client (this will create and connect)
+                client = await mcp_client_manager.get_client(server_name)
+
+                # Initialize and get server info
+                server_info = await mcp_client_manager.initialize_client(server_name)
+
+            console.print(Panel.fit(
+                f"[bold blue]Server:[/bold blue] {server_info['server_name']}\n"
+                f"[bold blue]Version:[/bold blue] {server_info['server_version']}\n"
+                f"[bold blue]Title:[/bold blue] {server_info['server_title']}\n"
+                f"[bold blue]Capabilities:[/bold blue]\n" +
+                "\n".join(f"  • {cap}: {'✓' if enabled else '✗'}" for cap, enabled in server_info['capabilities'].items()),
+                title=f"Connected to {server_name}"
+            ))
+
+            if server_info.get('instructions'):
+                console.print(f"\n[bold]Instructions:[/bold] {server_info['instructions']}")
+
+        asyncio.run(_connect())
+
+    except Exception as e:
+        console.print(f"[red]Error connecting to {server_name}: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+def local_tools(server_name):
+    """List tools available on a local MCP server"""
+    try:
+        async def _list_tools():
+            with console.status(f"[bold cyan]Fetching tools from {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                tools = await mcp_client_manager.list_tools(server_name)
+
+            if not tools:
+                console.print(f"[yellow]No tools available on {server_name}.[/yellow]")
+                return
+
+            table = Table(title=f"Tools on {server_name}")
+            table.add_column("Name", style="cyan")
+            table.add_column("Title", style="magenta")
+            table.add_column("Description", style="white")
+
+            for tool in tools:
+                description = tool.get('description', '')
+                if len(description) > 80:
+                    description = description[:77] + "..."
+
+                table.add_row(
+                    tool['name'],
+                    tool.get('title', tool['name']),
+                    description
+                )
+
+            console.print(table)
+
+        asyncio.run(_list_tools())
+
+    except Exception as e:
+        console.print(f"[red]Error listing tools for {server_name}: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+@click.argument('tool_name')
+@click.option('--args', help='JSON arguments for the tool')
+def local_call_tool(server_name, tool_name, args):
+    """Call a tool on a local MCP server"""
+    try:
+        async def _call_tool():
+            # Parse arguments
+            arguments = {}
+            if args:
+                try:
+                    arguments = json.loads(args)
+                except json.JSONDecodeError as e:
+                    console.print(f"[red]Invalid JSON arguments: {e}[/red]")
+                    return
+
+            with console.status(f"[bold cyan]Calling {tool_name} on {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                result = await mcp_client_manager.call_tool(server_name, tool_name, arguments)
+
+            # Display result
+            if result['success']:
+                console.print(f"[green]Tool executed successfully[/green]")
+                if result.get('content'):
+                    console.print("[bold]Content:[/bold]")
+                    for content_block in result['content']:
+                        if content_block['type'] == 'text':
+                            console.print(Markdown(content_block['text']))
+                        elif content_block['type'] == 'image':
+                            console.print(f"[dim]Image: {content_block.get('mimeType', 'unknown')}[/dim]")
+            else:
+                console.print(f"[red]Tool execution failed: {result.get('error', 'Unknown error')}[/red]")
+
+        asyncio.run(_call_tool())
+
+    except Exception as e:
+        console.print(f"[red]Error calling tool {tool_name} on {server_name}: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+def local_resources(server_name):
+    """List resources available on a local MCP server"""
+    try:
+        async def _list_resources():
+            with console.status(f"[bold cyan]Fetching resources from {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                resources = await mcp_client_manager.list_resources(server_name)
+
+            if not resources:
+                console.print(f"[yellow]No resources available on {server_name}.[/yellow]")
+                return
+
+            table = Table(title=f"Resources on {server_name}")
+            table.add_column("URI", style="cyan")
+            table.add_column("Name", style="magenta")
+            table.add_column("Description", style="white")
+            table.add_column("MIME Type", style="green")
+
+            for resource in resources:
+                uri = resource['uri']
+                if len(uri) > 50:
+                    uri = uri[:47] + "..."
+
+                description = resource.get('description', '')
+                if len(description) > 60:
+                    description = description[:57] + "..."
+
+                table.add_row(
+                    uri,
+                    resource.get('name', 'N/A'),
+                    description,
+                    resource.get('mimeType', 'N/A')
+                )
+
+            console.print(table)
+
+        asyncio.run(_list_resources())
+
+    except Exception as e:
+        console.print(f"[red]Error listing resources for {server_name}: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+@click.argument('uri')
+def local_read_resource(server_name, uri):
+    """Read a resource from a local MCP server"""
+    try:
+        async def _read_resource():
+            with console.status(f"[bold cyan]Reading resource {uri} from {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                result = await mcp_client_manager.read_resource(server_name, uri)
+
+            console.print(f"[bold]Resource:[/bold] {result['uri']}")
+            console.print("[bold]Content:[/bold]")
+
+            for content in result['content']:
+                if content['type'] == 'text':
+                    console.print(Markdown(content['text']))
+                elif content['type'] == 'blob':
+                    console.print(f"[dim]Binary data ({content.get('mimeType', 'unknown')}): {len(content['blob'])} bytes[/dim]")
+
+        asyncio.run(_read_resource())
+
+    except Exception as e:
+        console.print(f"[red]Error reading resource {uri} from {server_name}: {e}[/red]")
+
+@mcp.command()
+@click.argument('server_name')
+def local_prompts(server_name):
+    """List prompts available on a local MCP server"""
+    try:
+        async def _list_prompts():
+            with console.status(f"[bold cyan]Fetching prompts from {server_name}...[/bold cyan]"):
+                # Ensure configs are loaded
+                mcp_client_manager.load_server_configs()
+
+                prompts = await mcp_client_manager.list_prompts(server_name)
+
+            if not prompts:
+                console.print(f"[yellow]No prompts available on {server_name}.[/yellow]")
+                return
+
+            table = Table(title=f"Prompts on {server_name}")
+            table.add_column("Name", style="cyan")
+            table.add_column("Description", style="white")
+            table.add_column("Arguments", style="green")
+
+            for prompt in prompts:
+                description = prompt.get('description', '')
+                if len(description) > 80:
+                    description = description[:77] + "..."
+
+                args_list = prompt.get('arguments', [])
+                args_display = ', '.join(f"{arg['name']}{' (required)' if arg.get('required') else ''}" for arg in args_list)
+                if len(args_display) > 40:
+                    args_display = args_display[:37] + "..."
+
+                table.add_row(
+                    prompt['name'],
+                    description,
+                    args_display if args_list else "[dim]None[/dim]"
+                )
+
+            console.print(table)
+
+        asyncio.run(_list_prompts())
+
+    except Exception as e:
+        console.print(f"[red]Error listing prompts for {server_name}: {e}[/red]")
 
 # Store commands
 @cli.group()
