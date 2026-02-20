@@ -11,7 +11,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.0.8)
+## ✨ What's New (v1.0.9)
 
 ### 🤖 Agent Mode Support
 

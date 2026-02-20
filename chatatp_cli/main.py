@@ -51,7 +51,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.8", prog_name="ChatATP CLI")
+@click.version_option(version="1.0.9", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -344,7 +344,7 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                 model=model,
                 toolkit_ids=list(toolkits) if toolkits else None,
                 mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None,
-                agent_mode=config.agent_mode
+                agent_mode=config_manager.agent_mode
             ):
                 chunk_count += 1
 
@@ -362,7 +362,7 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
 
                     # Check if this is a device tool call that we need to execute locally
                     execution_type = chunk.get('execution_type')
-                    if execution_type == 'device' and config.agent_mode:
+                    if execution_type == 'device' and config_manager.agent_mode:
                         # Execute device tool locally
                         result = asyncio.run(_execute_device_tool(chunk))
                         if result:
@@ -521,7 +521,7 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                 model=model,
                 toolkit_ids=list(toolkits) if toolkits else None,
                 mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None,
-                agent_mode=config.agent_mode
+                agent_mode=config_manager.agent_mode            
             ):
                 chunk_count += 1
 
@@ -539,7 +539,7 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
 
                     # Check if this is a device tool call that we need to execute locally
                     execution_type = chunk.get('execution_type')
-                    if execution_type == 'device' and config.agent_mode:
+                    if execution_type == 'device' and config_manager.agent_mode:
                         # Execute device tool locally
                         result = asyncio.run(_execute_device_tool(chunk))
                         if result:
@@ -1343,7 +1343,7 @@ def agent_mode(enable):
     """Manage agent mode for device tool execution"""
     if enable is None:
         # Show current status
-        current_status = "[green]ENABLED[/green]" if config.agent_mode else "[red]DISABLED[/red]"
+        current_status = "[green]ENABLED[/green]" if config_manager.agent_mode else "[red]DISABLED[/red]"
         console.print(f"Agent mode is currently: {current_status}")
         console.print("\nAgent mode allows the CLI to act as an agent on your device:")
         console.print("  • Automatically discovers and shares local MCP tools with the API")
@@ -1351,7 +1351,7 @@ def agent_mode(enable):
         console.print("  • Returns tool execution results back to the API")
         console.print("\nUse --enable or --disable to change the setting.")
     else:
-        config.agent_mode = enable
+        config_manager.agent_mode = enable
         status = "[green]ENABLED[/green]" if enable else "[red]DISABLED[/red]"
         console.print(f"Agent mode {status}")
 
