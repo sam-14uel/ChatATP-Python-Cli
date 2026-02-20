@@ -51,7 +51,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.7", prog_name="ChatATP CLI")
+@click.version_option(version="1.0.8", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -420,6 +420,8 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                         full_response += message_chunk
 
                     if chunk.get('is_typing') == False:
+                        # Send completion notification
+                        notification_manager.notify_ai_complete(model)
                         break
 
         if response_started:

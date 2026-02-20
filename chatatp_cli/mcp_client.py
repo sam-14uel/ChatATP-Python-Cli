@@ -232,27 +232,28 @@ class MCPClientManager:
         Returns:
             List of tool definitions
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            tools_result = await client.list_tools()
+        async with client:
+            try:
+                tools_result = await client.list_tools()
 
-            # Convert to dictionary format
-            tools = []
-            for tool in tools_result:
-                tools.append({
-                    "name": tool.name,
-                    "title": tool.title if hasattr(tool, 'title') and tool.title else tool.name,
-                    "description": getattr(tool, 'description', ''),
-                    "input_schema": getattr(tool, 'inputSchema', {}),
-                    "output_schema": getattr(tool, 'outputSchema', {})
-                })
+                # Convert to dictionary format
+                tools = []
+                for tool in tools_result:
+                    tools.append({
+                        "name": tool.name,
+                        "title": tool.title if hasattr(tool, 'title') and tool.title else tool.name,
+                        "description": getattr(tool, 'description', ''),
+                        "input_schema": getattr(tool, 'inputSchema', {}),
+                        "output_schema": getattr(tool, 'outputSchema', {})
+                    })
 
-            return tools
+                return tools
 
-        except Exception as e:
-            logger.error(f"Failed to list tools for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to list tools for {server_name}: {e}")
+                raise
 
     async def call_tool(
         self,
@@ -275,53 +276,54 @@ class MCPClientManager:
         Returns:
             Dictionary with tool results
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            result = await client.call_tool(
-                name=tool_name,
-                arguments=arguments,
-                timeout=timeout,
-                raise_on_error=raise_on_error
-            )
+        async with client:
+            try:
+                result = await client.call_tool(
+                    name=tool_name,
+                    arguments=arguments,
+                    timeout=timeout,
+                    raise_on_error=raise_on_error
+                )
 
-            # Return structured response
-            response = {
-                "success": not result.is_error,
-                "data": result.data,
-                "structured_content": getattr(result, 'structured_content', []),
-                "content": [],
-                "meta": getattr(result, "_meta", {})
-            }
+                # Return structured response
+                response = {
+                    "success": not result.is_error,
+                    "data": result.data,
+                    "structured_content": getattr(result, 'structured_content', []),
+                    "content": [],
+                    "meta": getattr(result, "_meta", {})
+                }
 
-            # Add content blocks
-            for content_block in result.content:
-                if hasattr(content_block, 'text'):
-                    response["content"].append({
-                        "type": "text",
-                        "text": content_block.text
-                    })
-                elif hasattr(content_block, 'data'):
-                    response["content"].append({
-                        "type": "image",
-                        "data": content_block.data,
-                        "mimeType": content_block.mimeType
-                    })
+                # Add content blocks
+                for content_block in result.content:
+                    if hasattr(content_block, 'text'):
+                        response["content"].append({
+                            "type": "text",
+                            "text": content_block.text
+                        })
+                    elif hasattr(content_block, 'data'):
+                        response["content"].append({
+                            "type": "image",
+                            "data": content_block.data,
+                            "mimeType": content_block.mimeType
+                        })
 
-            return response
+                return response
 
-        except ToolError as e:
-            logger.error(f"Tool error for {server_name}.{tool_name}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "data": None,
-                "content": []
-            }
+            except ToolError as e:
+                logger.error(f"Tool error for {server_name}.{tool_name}: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "data": None,
+                    "content": []
+                }
 
-        except Exception as e:
-            logger.error(f"Failed to call tool {tool_name} for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to call tool {tool_name} for {server_name}: {e}")
+                raise
 
     async def list_resources(self, server_name: str) -> List[Dict[str, Any]]:
         """
@@ -333,26 +335,27 @@ class MCPClientManager:
         Returns:
             List of resource definitions
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            resources_result = await client.list_resources()
+        async with client:
+            try:
+                resources_result = await client.list_resources()
 
-            # Convert to dictionary format
-            resources = []
-            for resource in resources_result:
-                resources.append({
-                    "uri": resource.uri,
-                    "name": resource.name,
-                    "description": getattr(resource, 'description', ''),
-                    "mimeType": getattr(resource, 'mimeType', None),
-                })
+                # Convert to dictionary format
+                resources = []
+                for resource in resources_result:
+                    resources.append({
+                        "uri": resource.uri,
+                        "name": resource.name,
+                        "description": getattr(resource, 'description', ''),
+                        "mimeType": getattr(resource, 'mimeType', None),
+                    })
 
-            return resources
+                return resources
 
-        except Exception as e:
-            logger.error(f"Failed to list resources for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to list resources for {server_name}: {e}")
+                raise
 
     async def read_resource(self, server_name: str, uri: str) -> Dict[str, Any]:
         """
@@ -365,38 +368,39 @@ class MCPClientManager:
         Returns:
             Dictionary with resource content
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            contents = await client.read_resource(uri)
+        async with client:
+            try:
+                contents = await client.read_resource(uri)
 
-            # Convert to dictionary format
-            response = {
-                "uri": uri,
-                "content": []
-            }
+                # Convert to dictionary format
+                response = {
+                    "uri": uri,
+                    "content": []
+                }
 
-            for content in contents:
-                if hasattr(content, 'text'):
-                    response["content"].append({
-                        "type": "text",
-                        "text": content.text,
-                        "uri": getattr(content, 'uri', uri),
-                        "mimeType": getattr(content, 'mimeType', None)
-                    })
-                elif hasattr(content, 'blob'):
-                    response["content"].append({
-                        "type": "blob",
-                        "blob": content.blob,
-                        "uri": getattr(content, 'uri', uri),
-                        "mimeType": content.mimeType
-                    })
+                for content in contents:
+                    if hasattr(content, 'text'):
+                        response["content"].append({
+                            "type": "text",
+                            "text": content.text,
+                            "uri": getattr(content, 'uri', uri),
+                            "mimeType": getattr(content, 'mimeType', None)
+                        })
+                    elif hasattr(content, 'blob'):
+                        response["content"].append({
+                            "type": "blob",
+                            "blob": content.blob,
+                            "uri": getattr(content, 'uri', uri),
+                            "mimeType": content.mimeType
+                        })
 
-            return response
+                return response
 
-        except Exception as e:
-            logger.error(f"Failed to read resource {uri} for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to read resource {uri} for {server_name}: {e}")
+                raise
 
     async def list_prompts(self, server_name: str) -> List[Dict[str, Any]]:
         """
@@ -408,32 +412,33 @@ class MCPClientManager:
         Returns:
             List of prompt definitions
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            prompts_result = await client.list_prompts()
+        async with client:
+            try:
+                prompts_result = await client.list_prompts()
 
-            # Convert to dictionary format
-            prompts = []
-            for prompt in prompts_result:
-                prompts.append({
-                    "name": prompt.name,
-                    "description": getattr(prompt, 'description', ''),
-                    "arguments": [
-                        {
-                            "name": arg.name,
-                            "description": getattr(arg, 'description', ''),
-                            "required": getattr(arg, 'required', False)
-                        }
-                        for arg in (getattr(prompt, 'arguments', []) or [])
-                    ]
-                })
+                # Convert to dictionary format
+                prompts = []
+                for prompt in prompts_result:
+                    prompts.append({
+                        "name": prompt.name,
+                        "description": getattr(prompt, 'description', ''),
+                        "arguments": [
+                            {
+                                "name": arg.name,
+                                "description": getattr(arg, 'description', ''),
+                                "required": getattr(arg, 'required', False)
+                            }
+                            for arg in (getattr(prompt, 'arguments', []) or [])
+                        ]
+                    })
 
-            return prompts
+                return prompts
 
-        except Exception as e:
-            logger.error(f"Failed to list prompts for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to list prompts for {server_name}: {e}")
+                raise
 
     async def cleanup_all(self):
         """
