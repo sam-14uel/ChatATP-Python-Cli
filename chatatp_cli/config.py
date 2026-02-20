@@ -73,6 +73,14 @@ class Config:
     @sound_enabled.setter
     def sound_enabled(self, value: bool):
         self._config['sound_enabled'] = value
+        
+    @property
+    def agent_mode(self) -> bool:
+        return self._config.get('agent_mode', False)
+
+    @agent_mode.setter
+    def agent_mode(self, value: bool):
+        self._config['agent_mode'] = value
         self.save_config()
 
     def get_headers(self) -> dict:

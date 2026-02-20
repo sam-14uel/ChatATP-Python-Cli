@@ -343,7 +343,8 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                 message=message,
                 model=model,
                 toolkit_ids=list(toolkits) if toolkits else None,
-                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
+                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None,
+                agent_mode=config.agent_mode
             ):
                 chunk_count += 1
 
@@ -358,6 +359,16 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                     tool_name = tool.get('name') or chunk.get('toolkit_name') or 'tool'
                     toolkit   = chunk.get('toolkit_name', '')
                     args      = tool.get('arguments', {})
+
+                    # Check if this is a device tool call that we need to execute locally
+                    execution_type = chunk.get('execution_type')
+                    if execution_type == 'device' and config.agent_mode:
+                        # Execute device tool locally
+                        result = asyncio.run(_execute_device_tool(chunk))
+                        if result:
+                            # Send result back to API
+                            asyncio.run(_send_tool_result(room_id, chunk, result))
+                        continue
 
                     arg_hint = ''
                     if args:
@@ -509,7 +520,8 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                 message=message,
                 model=model,
                 toolkit_ids=list(toolkits) if toolkits else None,
-                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None
+                mcp_server_connection_ids=list(mcp_connections) if mcp_connections else None,
+                agent_mode=config.agent_mode
             ):
                 chunk_count += 1
 
@@ -524,6 +536,16 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                     tool_name = tool.get('name') or chunk.get('toolkit_name') or 'tool'
                     toolkit   = chunk.get('toolkit_name', '')
                     args      = tool.get('arguments', {})
+
+                    # Check if this is a device tool call that we need to execute locally
+                    execution_type = chunk.get('execution_type')
+                    if execution_type == 'device' and config.agent_mode:
+                        # Execute device tool locally
+                        result = asyncio.run(_execute_device_tool(chunk))
+                        if result:
+                            # Send result back to API
+                            asyncio.run(_send_tool_result(room_id, chunk, result))
+                        continue
 
                     arg_hint = ''
                     if args:
@@ -1313,6 +1335,78 @@ def pricing():
             console.print()  # Spacing between plans
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+
+# Agent mode command
+@cli.command()
+@click.option('--enable/--disable', default=None, help='Enable or disable agent mode')
+def agent_mode(enable):
+    """Manage agent mode for device tool execution"""
+    if enable is None:
+        # Show current status
+        current_status = "[green]ENABLED[/green]" if config.agent_mode else "[red]DISABLED[/red]"
+        console.print(f"Agent mode is currently: {current_status}")
+        console.print("\nAgent mode allows the CLI to act as an agent on your device:")
+        console.print("  • Automatically discovers and shares local MCP tools with the API")
+        console.print("  • Executes device-based tool calls locally when requested")
+        console.print("  • Returns tool execution results back to the API")
+        console.print("\nUse --enable or --disable to change the setting.")
+    else:
+        config.agent_mode = enable
+        status = "[green]ENABLED[/green]" if enable else "[red]DISABLED[/red]"
+        console.print(f"Agent mode {status}")
+
+# Helper functions for agent mode
+async def _execute_device_tool(chunk):
+    """Execute a device tool call locally"""
+    try:
+        tool = chunk.get('tool', {})
+        server_name = tool.get('server_name')
+        tool_name = tool.get('name')
+        arguments = tool.get('arguments', {})
+
+        if not server_name or not tool_name:
+            console.print(f"[red]Invalid device tool call: missing server_name or tool_name[/red]")
+            return None
+
+        # Execute the tool using MCP client
+        result = await mcp_client_manager.call_tool(server_name, tool_name, arguments)
+
+        if result['success']:
+            console.print(f"[green]✓[/green] [dim]Device tool executed: {server_name}.{tool_name}[/dim]")
+            return result
+        else:
+            console.print(f"[red]✗[/red] [dim]Device tool failed: {server_name}.{tool_name}[/dim]")
+            return result
+
+    except Exception as e:
+        console.print(f"[red]Error executing device tool: {e}[/red]")
+        return {'success': False, 'error': str(e)}
+
+async def _send_tool_result(room_id, tool_chunk, tool_result):
+    """Send tool execution result back to the API"""
+    try:
+        # Format the result for the API
+        result_data = {
+            'message_type': 'tool_result',
+            'tool_call_id': tool_chunk.get('tool_call_id'),
+            'tool': tool_chunk.get('tool', {}),
+            'result': {
+                'success': tool_result.get('success', False),
+                'content': tool_result.get('content', []),
+                'error': tool_result.get('error')
+            }
+        }
+
+        # Send the result to the API
+        response = api._post(f'/api/v1/chats/{room_id}/tool-result/', result_data)
+
+        if response.status_code == 200:
+            console.print(f"[dim]Tool result sent to API[/dim]")
+        else:
+            console.print(f"[yellow]Warning: Failed to send tool result to API ({response.status_code})[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error sending tool result to API: {e}[/red]")
 
 if __name__ == '__main__':
     cli()

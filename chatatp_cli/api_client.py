@@ -2,6 +2,7 @@ import requests
 from typing import Dict, List, Optional, Any
 import json
 from .config import Config
+import asyncio
 
 class ChatATPAPI:
     def __init__(self, config: Config):
@@ -84,7 +85,7 @@ class ChatATPAPI:
 
     def send_chat_message_stream(self, room_id: str, message: str, model: str = None,
                                toolkit_ids: List[str] = None, mcp_server_connection_ids: List[str] = None,
-                               attachments: List = None):
+                               attachments: List = None, agent_mode: bool = False):
         """Send chat message and yield streaming response chunks"""
         url = f"{self.config.api_base_url}/api/v1/chats/{room_id}/completions/stream/"
         data = {
@@ -95,6 +96,12 @@ class ChatATPAPI:
             'mcp_server_connection_ids': mcp_server_connection_ids or [],
             'attachments': attachments or []
         }
+
+        # Add device tools if agent mode is enabled
+        if agent_mode:
+            device_tools = self._collect_device_tools()
+            if device_tools:
+                data['device_tools'] = device_tools
 
         with self.session.post(url, json=data, stream=True) as response:
             response.raise_for_status()
@@ -181,3 +188,33 @@ class ChatATPAPI:
     def get_pricing(self) -> List[Dict]:
         """Get pricing information"""
         return self._get('/api/v1/payments/pricing/')
+
+    def _collect_device_tools(self) -> List[Dict]:
+        """Collect all available MCP tools from configured servers for agent mode"""
+        try:
+            from .mcp_client import mcp_client_manager
+
+            device_tools = []
+            configs = mcp_client_manager.load_server_configs()
+
+            for server_name in configs:
+                try:
+                    # Get tools for this server
+                    tools = asyncio.run(mcp_client_manager.list_tools(server_name))
+                    for tool in tools:
+                        device_tools.append({
+                            'server_name': server_name,
+                            'title': tool.get('title', tool['name']),
+                            'name': tool.get('name'),
+                            'description': tool.get('description', ''),
+                            'input_schema': tool.get('inputSchema', {}),
+                            'output_schema': tool.get('outputSchema', {})
+                        })
+                except Exception as e:
+                    # Skip servers that fail to load
+                    continue
+
+            return device_tools
+        except Exception as e:
+            # If anything fails, return empty list
+            return []

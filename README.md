@@ -13,6 +13,13 @@ A powerful terminal interface for the ChatATP API, built with Python. Interact w
 
 ## ✨ What's New (v1.0.8)
 
+### 🤖 Agent Mode Support
+
+- **Device Agent**: CLI can now act as an agent on your local device
+- **MCP Tool Execution**: Automatically discovers and executes local MCP tools
+- **Device Tool Calls**: AI can request local tool execution via `execution_type='device'`
+- **Seamless Integration**: Tool results flow back to AI for continued conversation
+
 ### 🚀 Agentic Loop Support
 - **Interactive Conversations**: Back-and-forth chat with persistent context
 - **Real-time Streaming**: Responses appear as they're generated with tool call visualization
@@ -20,6 +27,7 @@ A powerful terminal interface for the ChatATP API, built with Python. Interact w
 - **In-chat Commands**: Rich command system during conversations (`/exit`, `/help`, `/clear`, `/history`)
 
 ### 🔄 Chat Evolution
+
 - **Before**: One-shot messages that exit immediately
 - **Now**: Persistent interactive sessions with agentic conversations
 - **Streaming**: Tool calls, thinking blocks, and responses all visualized in real-time
@@ -500,6 +508,123 @@ While the local MCP client works independently, you can also use MCP connections
 **Server not found**: Ensure your config file exists and is properly formatted
 **Connection failed**: Check that the MCP server command is installed and available
 **Tool errors**: Verify tool arguments match the expected schema from `local-tools`
+
+## 🤖 Agent Mode
+
+ChatATP CLI can now act as a **full agent on your local device**, automatically discovering and executing MCP tools when requested by AI. This transforms your CLI into an intelligent assistant that can perform actions on your computer.
+
+### 🎯 What is Agent Mode?
+
+Agent mode enables the CLI to:
+- **Discover Local Tools**: Automatically scans configured MCP servers for available tools
+- **Execute Device Actions**: Runs tools locally when AI requests device-based operations
+- **Seamless Conversation**: Tool results flow back to AI for continued intelligent responses
+- **Secure Local Execution**: All tool execution happens on your device, not in the cloud
+
+### ⚙️ Enabling Agent Mode
+
+```bash
+# Enable agent mode
+chatatp agent-mode --enable
+
+# Disable agent mode
+chatatp agent-mode --disable
+
+# Check current status
+chatatp agent-mode
+```
+
+### 🔄 How Agent Mode Works
+
+1. **Tool Discovery**: When agent mode is enabled, CLI collects schemas from all configured MCP servers
+2. **API Integration**: Tool schemas are sent to ChatATP API in `device_tools` payload
+3. **AI Requests**: AI can request tool execution with `execution_type='device'`
+4. **Local Execution**: CLI executes the tool locally on your device
+5. **Result Relay**: Execution results are sent back to AI for continued conversation
+
+### 📋 Example Agent Conversation
+
+```bash
+# Enable agent mode
+$ chatatp agent-mode --enable
+Agent mode ENABLED
+
+# Start a conversation where AI can use local tools
+$ chatatp chat new "List the files in my current directory and analyze what you see"
+
+Chatroom created: abc123
+Entered chatroom: abc123
+
+You: List the files in my current directory and analyze what you see
+
+ChatATP ·
+
+I need to see what files are in your current directory. Let me use the filesystem tool to list them.
+
+✓ Device tool executed: filesystem.list_directory
+
+Based on the files I can see in your directory, you have a Python project with:
+- README.md: Project documentation
+- requirements.txt: Python dependencies
+- chatatp_cli/: Main package directory
+- pyproject.toml: Project configuration
+
+This appears to be the ChatATP CLI project itself! The structure suggests...
+
+─────────────────────────────────
+You: Can you read the README and tell me what's new?
+```
+
+### 🛠️ Supported Device Tools
+
+Agent mode works with any MCP-compatible tools, including:
+
+- **Filesystem Tools**: Read, write, list, and manage files and directories
+- **Web Tools**: Browser automation, web scraping, search capabilities
+- **Development Tools**: Code analysis, documentation lookup, repository management
+- **System Tools**: Process management, system information, configuration
+- **Custom Tools**: Any MCP server you configure locally
+
+### 🔐 Security & Privacy
+
+- **Local Execution Only**: Tools run on your device, not sent to external servers
+- **No Data Leakage**: Conversations and tool results stay local until you share them
+- **Configurable Access**: MCP servers define their own access controls
+- **Process Isolation**: Each MCP server runs in its own secure process
+
+### ⚠️ Important Notes
+
+- **Agent mode is disabled by default** for security
+- **Requires MCP server configuration** (see Local MCP Client section above)
+- **Tool execution may take time** depending on the operation
+- **Results are sent back to AI** for continued intelligent responses
+- **All execution happens locally** on your device
+
+### 🔧 Configuration Requirements
+
+Before using agent mode, ensure you have:
+
+1. **MCP servers configured** in one of the supported config files
+2. **Agent mode enabled** via `chatatp agent-mode --enable`
+3. **Valid API token** for ChatATP authentication
+
+### 📊 Status Indicators
+
+When agent mode is active, you'll see:
+- `[green]✓[/green]` for successful tool execution
+- `[red]✗[/red]` for failed tool execution
+- `[dim]Device tool executed: server_name.tool_name[/dim]` status messages
+
+### 🚀 Advanced Usage
+
+```bash
+# Combine with specific toolkits for enhanced capabilities
+chatatp chat new "Analyze my project structure" --toolkits code-analysis-toolkit
+
+# Use with custom MCP servers for specialized tasks
+# Configure your MCP server in ~/mcp.json, then:
+chatatp chat new "Run my custom analysis tool on this data"
+```
 
 ## AI Management
 

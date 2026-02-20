@@ -180,28 +180,29 @@ class MCPClientManager:
         Returns:
             Dictionary with initialization results
         """
-        client = await self.get_client(server_name)
+        client = await self._create_client(server_name)
 
-        try:
-            # Server info should be available after entering context
-            return {
-                "server_name": getattr(client.initialize_result.serverInfo, 'name', server_name) if hasattr(client, 'initialize_result') else server_name,
-                "server_version": getattr(client.initialize_result.serverInfo, 'version', 'unknown') if hasattr(client, 'initialize_result') else 'unknown',
-                "server_title": getattr(client.initialize_result.serverInfo, 'title', server_name) if hasattr(client, 'initialize_result') else server_name,
-                "capabilities": {
-                    "tools": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.tools is not None,
-                    "resources": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.resources is not None,
-                    "prompts": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.prompts is not None,
-                    "experimental": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.experimental is not None,
-                    "completions": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.completions is not None,
-                    "streaming": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.tasks is not None
-                },
-                "instructions": getattr(client.initialize_result, 'instructions', '') if hasattr(client, 'initialize_result') else ''
-            }
+        async with client:
+            try:
+                # Server info is available after entering context
+                return {
+                    "server_name": getattr(client.initialize_result.serverInfo, 'name', server_name) if hasattr(client, 'initialize_result') else server_name,
+                    "server_version": getattr(client.initialize_result.serverInfo, 'version', 'unknown') if hasattr(client, 'initialize_result') else 'unknown',
+                    "server_title": getattr(client.initialize_result.serverInfo, 'title', server_name) if hasattr(client, 'initialize_result') else server_name,
+                    "capabilities": {
+                        "tools": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.tools is not None,
+                        "resources": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.resources is not None,
+                        "prompts": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.prompts is not None,
+                        "experimental": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.experimental is not None,
+                        "completions": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.completions is not None,
+                        "streaming": hasattr(client, 'initialize_result') and client.initialize_result.capabilities.tasks is not None
+                    },
+                    "instructions": getattr(client.initialize_result, 'instructions', '') if hasattr(client, 'initialize_result') else ''
+                }
 
-        except Exception as e:
-            logger.error(f"Failed to initialize client for {server_name}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Failed to initialize client for {server_name}: {e}")
+                raise
 
     async def close_client(self, server_name: str):
         """
