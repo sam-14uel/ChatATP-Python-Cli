@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chatatp-cli"
-version = "1.0.6"
+version = "1.0.7"
 description = "ChatATP CLI - Terminal Interface for ChatATP API"
 readme = "README.md"
 authors = [

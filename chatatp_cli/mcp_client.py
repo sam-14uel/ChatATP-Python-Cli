@@ -34,8 +34,8 @@ class MCPClientManager:
         Looks for:
         - mcp.json
         - mcp_config.json
-        - claude_desktop_config.json
-        - .chatatp/mcp.json
+        - mcp_server.json
+        - claude_desktop_config.json (Claude format)
         """
         configs = {}
 
@@ -46,6 +46,8 @@ class MCPClientManager:
             Path.home() / '.chatatp' / 'mcp.json',
             Path.home() / 'Library' / 'Application Support' / 'Claude' / 'claude_desktop_config.json',  # macOS
             Path.home() / 'AppData' / 'Roaming' / 'Claude' / 'claude_desktop_config.json',  # Windows
+            Path.home() / '.cursor' / 'mcp.json',  # Cursor
+            Path.home() / '.gemini' / 'antigravity' / 'mcp_server.json',  # Gemini
         ]
 
         for config_path in config_paths:
@@ -60,15 +62,35 @@ class MCPClientManager:
                         for server_name, server_config in data['mcpServers'].items():
                             configs[server_name] = server_config
                     elif isinstance(data, dict):
-                        # Direct server configs
-                        for server_name, server_config in data.items():
-                            if isinstance(server_config, dict):
+                        # Direct server configs (check for both mcpServers and direct format)
+                        if 'mcpServers' in data:
+                            for server_name, server_config in data['mcpServers'].items():
                                 configs[server_name] = server_config
+                        else:
+                            # Direct server configs
+                            for server_name, server_config in data.items():
+                                if isinstance(server_config, dict):
+                                    configs[server_name] = server_config
 
                     logger.info(f"Loaded MCP configs from {config_path}")
 
                 except Exception as e:
                     logger.warning(f"Failed to load config from {config_path}: {e}")
+
+        # Also check for .chatatp directory and create if it doesn't exist
+        chatatp_dir = Path.home() / '.chatatp'
+        chatatp_dir.mkdir(exist_ok=True)
+
+        # Create default mcp.json in .chatatp if it doesn't exist and no configs found
+        chatatp_mcp_file = chatatp_dir / 'mcp.json'
+        if not configs and not chatatp_mcp_file.exists():
+            try:
+                default_config = {}
+                with open(chatatp_mcp_file, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                logger.info(f"Created default MCP config at {chatatp_mcp_file}")
+            except Exception as e:
+                logger.warning(f"Failed to create default config: {e}")
 
         self._server_configs = configs
         return configs
