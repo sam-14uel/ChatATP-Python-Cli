@@ -428,15 +428,21 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                             # Send notification when AI starts responding
                             notification_manager.notify_ai_start(model)
 
+                            # Start live markdown display for streaming response
+                            live = Live(Markdown(""), console=console, refresh_per_second=60)
+                            live.start()
+
                         full_response += message_chunk
+                        live.update(Markdown(full_response))
 
                     if chunk.get('is_typing') == False:
-                        # Send completion notification
-                        notification_manager.notify_ai_complete(model)
-                        break
+                        # Mark as completed, but continue processing chunks
+                        pass
 
         if response_started:
-            console.print(Markdown(full_response))
+            live.stop()
+            notification_manager.notify_ai_complete(model)
+            console.print()
             console.print("\n[dim]─────────────────────────────────[/dim]")
         elif chunk_count == 0:
             console.print("[red]No data received.[/red]")
@@ -602,15 +608,24 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                                 f"\n[bold white]ChatATP[/bold white] [dim]·[/dim]\n"
                             )
 
+                            # Send notification when AI starts responding
+                            notification_manager.notify_ai_start(model)
+
+                            # Start live markdown display for streaming response
+                            live = Live(Markdown(""), console=console, refresh_per_second=60)
+                            live.start()
+
                         full_response += message_chunk
+                        live.update(Markdown(full_response))
 
                     if chunk.get('is_typing') == False:
-                        # Send completion notification
-                        notification_manager.notify_ai_complete(model)
-                        break
+                        # Mark as completed, but continue processing chunks
+                        pass
 
         if response_started:
-            console.print(Markdown(full_response))
+            live.stop()
+            notification_manager.notify_ai_complete(model)
+            console.print()
             console.print("\n[dim]─────────────────────────────────[/dim]")
         elif chunk_count == 0:
             console.print("[red]No data received.[/red]")
@@ -1072,6 +1087,47 @@ def local_call_tool(server_name, tool_name, args):
     except Exception as e:
         console.print(f"[red]Error calling tool {tool_name} on {server_name}: {e}[/red]")
 
+
+@mcp.command()
+@click.option('--host', default='127.0.0.1', help='Host to bind the proxy server to')
+@click.option('--port', default=8001, type=int, help='Port to bind the proxy server to')
+@click.option('--https/--no-https', default=False, help='Enable HTTPS with self-signed certificate')
+@click.option('--cert-file', help='Path to SSL certificate file (for HTTPS)')
+@click.option('--key-file', help='Path to SSL private key file (for HTTPS)')
+@click.option('--ngrok/--no-ngrok', default=False, help='Expose server publicly using ngrok')
+@click.option('--ngrok-token', help='ngrok authentication token (required for ngrok)')
+def proxy(host, port, https, cert_file, key_file, ngrok, ngrok_token):
+    """Start MCP proxy server to expose local servers as HTTP/HTTPS endpoints"""
+    try:
+        from .mcp_proxy import start_proxy_server
+        console.print(f"[green]Starting MCP Proxy Server on {host}:{port}[/green]")
+
+        if https:
+            console.print("[yellow]HTTPS enabled with self-signed certificate[/yellow]")
+        if ngrok:
+            console.print("[blue]Ngrok tunnel will be established for public access[/blue]")
+            if not ngrok_token:
+                console.print("[yellow]Warning: No ngrok token provided. Make sure ngrok is authenticated.[/yellow]")
+
+        console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
+
+        # Start the proxy server
+        start_proxy_server(
+            host=host,
+            port=port,
+            use_https=https,
+            cert_file=cert_file,
+            key_file=key_file,
+            use_ngrok=ngrok,
+            ngrok_auth_token=ngrok_token
+        )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]MCP Proxy Server stopped[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Error starting MCP proxy server: {e}[/red]")
+
+
 @mcp.command()
 @click.argument('server_name')
 def local_resources(server_name):
@@ -1385,25 +1441,26 @@ async def _execute_device_tool(chunk):
 async def _send_tool_result(room_id, tool_chunk, tool_result):
     """Send tool execution result back to the API"""
     try:
-        # Format the result for the API
+        # tool_call_id lives inside the nested "tool" object
+        tool_call_id = tool_chunk.get('tool', {}).get('id')  # ← was tool_chunk.get('tool_call_id')
+        
         result_data = {
-            'message_type': 'tool_result',
-            'tool_call_id': tool_chunk.get('tool_call_id'),
-            'tool': tool_chunk.get('tool', {}),
+            'tool_call_id': tool_call_id,
             'result': {
                 'success': tool_result.get('success', False),
                 'content': tool_result.get('content', []),
-                'error': tool_result.get('error')
+                'error': tool_result.get('error'),
+                'mode': 'device'
             }
         }
 
         # Send the result to the API
         response = api._post(f'/api/v1/chats/{room_id}/tool-result/', result_data)
 
-        if response.status_code == 200:
-            console.print(f"[dim]Tool result sent to API[/dim]")
-        else:
-            console.print(f"[yellow]Warning: Failed to send tool result to API ({response.status_code})[/yellow]")
+        # if response.status == 200:
+        #     console.print(f"[dim]Tool result sent to API[/dim]")
+        # else:
+        #     console.print(f"[yellow]Warning: Failed to send tool result to API ({response.status_code})[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error sending tool result to API: {e}[/red]")

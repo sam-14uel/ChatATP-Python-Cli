@@ -83,6 +83,33 @@ class Config:
         self._config['agent_mode'] = value
         self.save_config()
 
+    @property
+    def proxy_host(self) -> str:
+        return self._config.get('proxy_host', '127.0.0.1')
+
+    @proxy_host.setter
+    def proxy_host(self, value: str):
+        self._config['proxy_host'] = value
+        self.save_config()
+
+    @property
+    def proxy_port(self) -> int:
+        return self._config.get('proxy_port', 8001)
+
+    @proxy_port.setter
+    def proxy_port(self, value: int):
+        self._config['proxy_port'] = value
+        self.save_config()
+
+    @property
+    def proxy_enabled(self) -> bool:
+        return self._config.get('proxy_enabled', False)
+
+    @proxy_enabled.setter
+    def proxy_enabled(self, value: bool):
+        self._config['proxy_enabled'] = value
+        self.save_config()
+
     def get_headers(self) -> dict:
         """Get headers for API requests"""
         headers = {

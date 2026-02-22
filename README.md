@@ -353,24 +353,26 @@ Create an `mcp.json` file in your home directory:
 
 ```json
 {
-  "context7": {
-    "command": "npx",
-    "args": ["-y", "@upstash/context7-mcp@latest"]
-  },
-  "tavily-search": {
-    "command": "npx",
-    "args": ["-y", "tavily-mcp@0.1.2"],
-    "env": {
-      "TAVILY_API_KEY": "your-api-key-here"
+    "mcpServers": {
+        "context7": {
+          "command": "npx",
+          "args": ["-y", "@upstash/context7-mcp@latest"]
+        },
+        "tavily-search": {
+          "command": "npx",
+          "args": ["-y", "tavily-mcp@0.1.2"],
+          "env": {
+            "TAVILY_API_KEY": "your-api-key-here"
+          }
+        },
+        "my-custom-server": {
+          "command": "python",
+          "args": ["-m", "my_mcp_server"],
+          "env": {
+            "CUSTOM_ENV_VAR": "value"
+          }
+        }
     }
-  },
-  "my-custom-server": {
-    "command": "python",
-    "args": ["-m", "my_mcp_server"],
-    "env": {
-      "CUSTOM_ENV_VAR": "value"
-    }
-  }
 }
 ```
 
@@ -429,11 +431,13 @@ chatatp mcp local-prompts context7
 ```bash
 # First, create a config file
 echo '{
-  "context7": {
-    "command": "npx",
-    "args": ["-y", "@upstash/context7-mcp@latest"]
-  }
-}' > ~/mcp.json
+        "mcpServers": {
+              "context7": {
+                "command": "npx",
+                "args": ["-y", "@upstash/context7-mcp@latest"]
+              }
+        }
+      }' > ~/mcp.json
 
 # List configured servers
 $ chatatp mcp local-servers
@@ -562,6 +566,7 @@ ChatATP ·
 I need to see what files are in your current directory. Let me use the filesystem tool to list them.
 
 ✓ Device tool executed: filesystem.list_directory
+  └ done
 
 Based on the files I can see in your directory, you have a Python project with:
 - README.md: Project documentation
@@ -625,6 +630,139 @@ chatatp chat new "Analyze my project structure" --toolkits code-analysis-toolkit
 # Configure your MCP server in ~/mcp.json, then:
 chatatp chat new "Run my custom analysis tool on this data"
 ```
+
+## 🌐 MCP Proxy Server
+
+The CLI includes a built-in HTTP/HTTPS proxy server that exposes your local MCP servers as REST API endpoints. This allows external clients (like ChatATP Proxy MCP Client) to interact with your local MCP servers via HTTP/HTTPS requests, while the actual tool execution happens securely on your device.
+
+### 🚀 Starting the Proxy Server
+
+```bash
+# HTTP mode (default)
+chatatp mcp proxy
+
+# HTTPS mode with self-signed certificate
+chatatp mcp proxy --https
+
+# HTTPS with custom certificates
+chatatp mcp proxy --https --cert-file /path/to/cert.pem --key-file /path/to/key.pem
+
+# Remote access with ngrok (creates public HTTPS URL)
+chatatp mcp proxy --ngrok --ngrok-token YOUR_NGROK_TOKEN
+
+# Full remote setup (HTTPS + ngrok)
+chatatp mcp proxy --https --ngrok --ngrok-token YOUR_NGROK_TOKEN --host 0.0.0.0
+```
+
+### 📡 API Endpoints
+
+Once running, the proxy server provides the following REST endpoints:
+
+#### Server Management
+- `GET /` - Server information and available endpoints (includes public URL if using ngrok)
+- `GET /servers` - List all configured MCP servers
+- `GET /servers/{server_name}` - Get detailed info about a specific server
+
+#### Tool Operations
+- `GET /servers/{server_name}/tools` - List tools available on a server
+- `POST /tools/{server_name}/{tool_name}` - Call a tool on a server
+
+```json
+// POST /tools/tavily-mcp/tavily-search
+{
+  "arguments": {
+    "query": "latest AI news",
+    "search_depth": "advanced"
+  }
+}
+```
+
+#### Resource Operations
+- `GET /servers/{server_name}/resources` - List resources on a server
+- `GET /resources/{server_name}/{uri}` - Read a specific resource
+
+#### Prompt Operations
+- `GET /servers/{server_name}/prompts` - List prompts on a server
+
+### 🔒 Security & HTTPS
+
+**Self-Signed Certificates:**
+- When using `--https` without custom certificates, the server automatically generates a self-signed SSL certificate
+- The certificate is valid for localhost and 127.0.0.1
+- Browsers will show security warnings for self-signed certificates
+
+**Custom Certificates:**
+- Use `--cert-file` and `--key-file` to provide your own SSL certificates
+- Required for production deployments
+
+**Remote Access:**
+- Use `--ngrok` to create a secure public tunnel
+- Requires ngrok authentication token (`--ngrok-token`)
+- Provides HTTPS URL automatically
+- Perfect for sharing with external services
+
+### 🎯 Use Cases
+
+- **Remote API Access**: Allow ChatATP cloud services to execute tools on your local machine
+- **Secure Tool Sharing**: Share filesystem tools with remote clients over HTTPS
+- **Development Testing**: Test MCP integrations without direct protocol knowledge
+- **Production Deployments**: Run proxy server with custom SSL certificates
+
+### ⚙️ Configuration & Setup
+
+#### ngrok Setup
+1. Install ngrok: `pip install pyngrok`
+2. Sign up at [ngrok.com](https://ngrok.com) and get your auth token
+3. Use the token with `--ngrok-token YOUR_TOKEN`
+
+#### Custom SSL Certificates
+```bash
+# Generate certificates (example)
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+
+# Use with proxy server
+chatatp mcp proxy --https --cert-file cert.pem --key-file key.pem
+```
+
+#### MCP Server Configuration
+The proxy server respects the same MCP server configurations as the CLI. Make sure your `mcp.json` or other config files are properly set up:
+
+```json
+{
+    "mcpServers": {
+        "tavily-mcp": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-tavily"],
+          "env": {
+            "TAVILY_API_KEY": "your-api-key"
+          }
+        },
+        "filesystem-mcp": {
+          "command": "npx", 
+          "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"],
+          "env": {}
+        }
+    }
+}
+```
+
+### 🌍 Remote Access Example
+
+```bash
+# Start proxy with ngrok for remote access
+chatatp mcp proxy --https --ngrok --ngrok-token YOUR_NGROK_TOKEN
+
+# Output will show:
+# Starting MCP Proxy Server on 127.0.0.1:8001
+# HTTPS enabled with self-signed certificate
+# Ngrok tunnel will be established for public access
+# Public URL: https://abc123.ngrok.io
+
+# Now external clients can access:
+# https://abc123.ngrok.io/tools/tavily-mcp/tavily-search
+```
+
+The proxy server will automatically discover and expose all configured MCP servers, providing secure remote access to your local MCP ecosystem!
 
 ## AI Management
 
