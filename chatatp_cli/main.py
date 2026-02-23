@@ -18,7 +18,6 @@ from .config import Config
 from .api_client import ChatATPAPI
 from .notifications import notification_manager
 from .mcp_client import mcp_client_manager
-import atexit
 import asyncio
 
 console = Console()
@@ -52,7 +51,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.1.0", prog_name="ChatATP CLI")
+@click.version_option(version="1.1.1", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -60,40 +59,6 @@ def cli(ctx):
     if ctx.invoked_subcommand is None:
         print_banner()
         console.print(ctx.get_help())
-
-    # Auto-start MCP proxy server if enabled
-    if config_manager.proxy_auto_start:
-        import threading
-        from .mcp_proxy import start_proxy_server
-
-        def start_proxy_in_background():
-            try:
-                console.print("[dim]Starting MCP proxy server in background...[/dim]")
-                start_proxy_server(
-                    host=config_manager.proxy_host,
-                    port=config_manager.proxy_port,
-                    use_ngrok=config_manager.proxy_use_ngrok,
-                    ngrok_auth_token=config_manager.proxy_ngrok_token
-                )
-            except Exception as e:
-                console.print(f"[red]Failed to start MCP proxy server: {e}[/red]")
-
-        # Start proxy server in background thread
-        proxy_thread = threading.Thread(target=start_proxy_in_background, daemon=True)
-        proxy_thread.start()
-
-    # Register cleanup function for proxy deregistration
-    def cleanup_proxy():
-        """Deregister MCP proxy when CLI exits"""
-        if config_manager.proxy_auto_start and config_manager.proxy_use_ngrok:
-            try:
-                api.unregister_proxy()
-                console.print("[dim]MCP proxy deregistered from ChatATP API[/dim]")
-            except Exception as e:
-                # Don't print error messages during shutdown as it might interfere with output
-                pass
-
-    atexit.register(cleanup_proxy)
 
 # Configuration commands
 @cli.group()
@@ -164,44 +129,12 @@ def disable_sound():
     console.print("[yellow]Notification sounds disabled.[/yellow]")
 
 @config.command()
-@click.option('--ngrok-token', help='ngrok authentication token for public access')
-@click.option('--port', default=8001, type=int, help='Port for the proxy server')
-@click.option('--host', default='127.0.0.1', help='Host for the proxy server')
-@click.option('--use-ngrok/--no-ngrok', default=True, help='Enable ngrok for public access')
-def enable_proxy_auto_start(ngrok_token, port, host, use_ngrok):
-    """Enable automatic MCP proxy server startup"""
-    if use_ngrok and not ngrok_token:
-        console.print("[red]Error: ngrok-token is required when using ngrok[/red]")
-        return
-
-    config_manager.proxy_auto_start = True
-    config_manager.proxy_ngrok_token = ngrok_token
-    config_manager.proxy_port = port
-    config_manager.proxy_host = host
-    config_manager.proxy_use_ngrok = use_ngrok
-
-    console.print("[green]MCP proxy auto-start enabled![/green]")
-    console.print(f"  Host: {host}")
-    console.print(f"  Port: {port}")
-    console.print(f"  Ngrok: {'enabled' if use_ngrok else 'disabled'}")
-    if use_ngrok:
-        console.print(f"  Ngrok Token: {'set' if ngrok_token else 'not set'}")
-    console.print("\n[bold]The MCP proxy server will now start automatically when you run any CLI command.[/bold]")
-
-@config.command()
-def disable_proxy_auto_start():
-    """Disable automatic MCP proxy server startup"""
-    config_manager.proxy_auto_start = False
-    console.print("[yellow]MCP proxy auto-start disabled.[/yellow]")
-
-@config.command()
 def proxy_status():
     """Show MCP proxy configuration and status"""
     table = Table(title="MCP Proxy Configuration")
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="magenta")
 
-    table.add_row("Auto Start", "[green]Enabled[/green]" if config_manager.proxy_auto_start else "[red]Disabled[/red]")
     table.add_row("Host", config_manager.proxy_host)
     table.add_row("Port", str(config_manager.proxy_port))
     table.add_row("Use Ngrok", "[green]Yes[/green]" if config_manager.proxy_use_ngrok else "[red]No[/red]")

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="ChatATP MCP Proxy Server",
     description="REST API proxy for local MCP servers with HTTPS and remote access support",
-    version="1.0.0"
+    version="1.0.1"
 )
 
 # Add CORS middleware
@@ -57,7 +57,7 @@ async def root(request: Request):
 
     return {
         "name": "ChatATP MCP Proxy Server",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "scheme": scheme,
         "local_url": f"{scheme}://{request.url.hostname}:{request.url.port}",
         "public_url": public_url,

@@ -11,7 +11,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.1.0)
+## ✨ What's New (v1.1.1)
 
 ### 🤖 Agent Mode Support
 
@@ -455,7 +455,7 @@ $ chatatp mcp local-connect context7
 Connected to context7
 ─────────────────────
 Server: Context7 MCP Server
-Version: 1.0.0
+Version: 1.0.1
 Title: Context7
 Capabilities:
   • tools: ✓

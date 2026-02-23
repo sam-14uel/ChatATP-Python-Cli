@@ -109,7 +109,7 @@ class Config:
     def proxy_enabled(self, value: bool):
         self._config['proxy_enabled'] = value
 
-    @propertly
+    @property
     def proxy_ngrok_token(self) -> Optional[str]:
         return self._config.get('proxy_ngrok_token')
 

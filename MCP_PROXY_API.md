@@ -24,7 +24,7 @@ Get server information and available endpoints.
 ```json
 {
   "name": "ChatATP MCP Proxy Server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scheme": "https",
   "local_url": "http://127.0.0.1:8001",
   "public_url": "https://your-ngrok-url.ngrok-free.dev",
