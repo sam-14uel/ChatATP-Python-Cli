@@ -18,6 +18,7 @@ from .config import Config
 from .api_client import ChatATPAPI
 from .notifications import notification_manager
 from .mcp_client import mcp_client_manager
+import atexit
 import asyncio
 
 console = Console()
@@ -51,7 +52,7 @@ def print_banner():
     console.print(banner, style="bold cyan")
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.9", prog_name="ChatATP CLI")
+@click.version_option(version="1.1.0", prog_name="ChatATP CLI")
 @click.pass_context
 def cli(ctx):
     """ChatATP CLI - Terminal Interface for ChatATP API"""
@@ -59,6 +60,40 @@ def cli(ctx):
     if ctx.invoked_subcommand is None:
         print_banner()
         console.print(ctx.get_help())
+
+    # Auto-start MCP proxy server if enabled
+    if config_manager.proxy_auto_start:
+        import threading
+        from .mcp_proxy import start_proxy_server
+
+        def start_proxy_in_background():
+            try:
+                console.print("[dim]Starting MCP proxy server in background...[/dim]")
+                start_proxy_server(
+                    host=config_manager.proxy_host,
+                    port=config_manager.proxy_port,
+                    use_ngrok=config_manager.proxy_use_ngrok,
+                    ngrok_auth_token=config_manager.proxy_ngrok_token
+                )
+            except Exception as e:
+                console.print(f"[red]Failed to start MCP proxy server: {e}[/red]")
+
+        # Start proxy server in background thread
+        proxy_thread = threading.Thread(target=start_proxy_in_background, daemon=True)
+        proxy_thread.start()
+
+    # Register cleanup function for proxy deregistration
+    def cleanup_proxy():
+        """Deregister MCP proxy when CLI exits"""
+        if config_manager.proxy_auto_start and config_manager.proxy_use_ngrok:
+            try:
+                api.unregister_proxy()
+                console.print("[dim]MCP proxy deregistered from ChatATP API[/dim]")
+            except Exception as e:
+                # Don't print error messages during shutdown as it might interfere with output
+                pass
+
+    atexit.register(cleanup_proxy)
 
 # Configuration commands
 @cli.group()
@@ -127,6 +162,52 @@ def disable_sound():
     config_manager.sound_enabled = False
     notification_manager.disable_sound()
     console.print("[yellow]Notification sounds disabled.[/yellow]")
+
+@config.command()
+@click.option('--ngrok-token', help='ngrok authentication token for public access')
+@click.option('--port', default=8001, type=int, help='Port for the proxy server')
+@click.option('--host', default='127.0.0.1', help='Host for the proxy server')
+@click.option('--use-ngrok/--no-ngrok', default=True, help='Enable ngrok for public access')
+def enable_proxy_auto_start(ngrok_token, port, host, use_ngrok):
+    """Enable automatic MCP proxy server startup"""
+    if use_ngrok and not ngrok_token:
+        console.print("[red]Error: ngrok-token is required when using ngrok[/red]")
+        return
+
+    config_manager.proxy_auto_start = True
+    config_manager.proxy_ngrok_token = ngrok_token
+    config_manager.proxy_port = port
+    config_manager.proxy_host = host
+    config_manager.proxy_use_ngrok = use_ngrok
+
+    console.print("[green]MCP proxy auto-start enabled![/green]")
+    console.print(f"  Host: {host}")
+    console.print(f"  Port: {port}")
+    console.print(f"  Ngrok: {'enabled' if use_ngrok else 'disabled'}")
+    if use_ngrok:
+        console.print(f"  Ngrok Token: {'set' if ngrok_token else 'not set'}")
+    console.print("\n[bold]The MCP proxy server will now start automatically when you run any CLI command.[/bold]")
+
+@config.command()
+def disable_proxy_auto_start():
+    """Disable automatic MCP proxy server startup"""
+    config_manager.proxy_auto_start = False
+    console.print("[yellow]MCP proxy auto-start disabled.[/yellow]")
+
+@config.command()
+def proxy_status():
+    """Show MCP proxy configuration and status"""
+    table = Table(title="MCP Proxy Configuration")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="magenta")
+
+    table.add_row("Auto Start", "[green]Enabled[/green]" if config_manager.proxy_auto_start else "[red]Disabled[/red]")
+    table.add_row("Host", config_manager.proxy_host)
+    table.add_row("Port", str(config_manager.proxy_port))
+    table.add_row("Use Ngrok", "[green]Yes[/green]" if config_manager.proxy_use_ngrok else "[red]No[/red]")
+    table.add_row("Ngrok Token", "Set" if config_manager.proxy_ngrok_token else "Not set")
+
+    console.print(table)
 
 # Account commands
 @cli.command()
@@ -429,11 +510,15 @@ def send_single_message(room_id, message, model=None, toolkits=None, mcp_connect
                             notification_manager.notify_ai_start(model)
 
                             # Start live markdown display for streaming response
-                            live = Live(Markdown(""), console=console, refresh_per_second=60)
+                            live = Live(Markdown(""), console=console, auto_refresh=False)
                             live.start()
+                            update_count = 0
 
                         full_response += message_chunk
                         live.update(Markdown(full_response))
+                        update_count += 1
+                        if update_count % 3 == 0:
+                            live.refresh()
 
                     if chunk.get('is_typing') == False:
                         # Mark as completed, but continue processing chunks
@@ -612,11 +697,15 @@ def send(room_id, message, model, toolkits, mcp_connections, debug):
                             notification_manager.notify_ai_start(model)
 
                             # Start live markdown display for streaming response
-                            live = Live(Markdown(""), console=console, refresh_per_second=60)
+                            live = Live(Markdown(""), console=console, auto_refresh=False)
                             live.start()
+                            update_count = 0
 
                         full_response += message_chunk
                         live.update(Markdown(full_response))
+                        update_count += 1
+                        if update_count % 3 == 0:
+                            live.refresh()
 
                     if chunk.get('is_typing') == False:
                         # Mark as completed, but continue processing chunks
@@ -1126,6 +1215,27 @@ def proxy(host, port, https, cert_file, key_file, ngrok, ngrok_token):
         console.print("\n[yellow]MCP Proxy Server stopped[/yellow]")
     except Exception as e:
         console.print(f"[red]Error starting MCP proxy server: {e}[/red]")
+
+@mcp.command()
+def proxy_stop():
+    """Stop the background MCP proxy server"""
+    try:
+        # Check if proxy is running by trying to connect to it
+        import requests
+        response = requests.get(f"http://{config_manager.proxy_host}:{config_manager.proxy_port}/", timeout=2)
+        if response.status_code == 200:
+            console.print("[yellow]Proxy server is running. To stop it, exit all CLI processes.[/yellow]")
+            console.print("[dim]The proxy runs in a daemon thread and stops when the CLI process terminates.[/dim]")
+        else:
+            console.print("[green]Proxy server is not running.[/green]")
+    except requests.exceptions.RequestException:
+        console.print("[green]Proxy server is not running.[/green]")
+
+    console.print("\n[bold]Background proxy behavior:[/bold]")
+    console.print("• Starts automatically when auto-start is enabled")
+    console.print("• Runs in daemon thread during CLI sessions")
+    console.print("• Stops automatically when CLI process exits")
+    console.print("• Each CLI command starts a new proxy instance")
 
 
 @mcp.command()

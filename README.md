@@ -11,7 +11,7 @@
 
 A powerful terminal interface for the ChatATP API, built with Python. Interact with ChatATP's AI models, manage chatrooms, toolkits, integrations, and more directly from your command line.
 
-## ✨ What's New (v1.0.9)
+## ✨ What's New (v1.1.0)
 
 ### 🤖 Agent Mode Support
 
@@ -520,6 +520,7 @@ ChatATP CLI can now act as a **full agent on your local device**, automatically 
 ### 🎯 What is Agent Mode?
 
 Agent mode enables the CLI to:
+
 - **Discover Local Tools**: Automatically scans configured MCP servers for available tools
 - **Execute Device Actions**: Runs tools locally when AI requests device-based operations
 - **Seamless Conversation**: Tool results flow back to AI for continued intelligent responses
@@ -635,24 +636,80 @@ chatatp chat new "Run my custom analysis tool on this data"
 
 The CLI includes a built-in HTTP/HTTPS proxy server that exposes your local MCP servers as REST API endpoints. This allows external clients (like ChatATP Proxy MCP Client) to interact with your local MCP servers via HTTP/HTTPS requests, while the actual tool execution happens securely on your device.
 
-### 🚀 Starting the Proxy Server
+### 🚀 One-Time Setup (Auto-Start Mode)
+
+**Enable automatic proxy startup** with your ngrok token once:
 
 ```bash
-# HTTP mode (default)
-chatatp mcp proxy
+chatatp config enable-proxy-auto-start --ngrok-token NGROK_AUTH_TOKEN
+```
+
+**That's it!** The proxy server will now start automatically every time you run any CLI command, providing continuous public HTTPS access to your MCP servers.
+
+### 🎮 Manual Control
+
+```bash
+# Start manually (traditional mode)
+chatatp mcp proxy --ngrok --ngrok-token YOUR_TOKEN
 
 # HTTPS mode with self-signed certificate
-chatatp mcp proxy --https
+chatatp mcp proxy --https --ngrok --ngrok-token YOUR_TOKEN
 
 # HTTPS with custom certificates
-chatatp mcp proxy --https --cert-file /path/to/cert.pem --key-file /path/to/key.pem
+chatatp mcp proxy --https --cert-file /path/to/cert.pem --key-file /path/to/key.pem --ngrok --ngrok-token YOUR_TOKEN
 
-# Remote access with ngrok (creates public HTTPS URL)
-chatatp mcp proxy --ngrok --ngrok-token YOUR_NGROK_TOKEN
-
-# Full remote setup (HTTPS + ngrok)
-chatatp mcp proxy --https --ngrok --ngrok-token YOUR_NGROK_TOKEN --host 0.0.0.0
+# Check proxy status and configuration
+chatatp config proxy-status
 ```
+
+### ⚙️ Auto-Start Configuration
+
+**Enable Auto-Start:**
+
+```bash
+chatatp config enable-proxy-auto-start --ngrok-token YOUR_TOKEN --host 127.0.0.1 --port 8001
+```
+
+**Disable Auto-Start:**
+
+```bash
+chatatp config disable-proxy-auto-start
+```
+
+**Check Status:**
+
+```bash
+chatatp config proxy-status
+```
+
+### � Hybrid Mode (Smart Routing)
+
+**Hybrid Mode** enables intelligent routing between direct proxy calls and traditional polling, automatically registering your proxy with the ChatATP API for optimal performance.
+
+#### ✨ **How It Works**
+
+- **Automatic Registration**: When the proxy starts with ngrok, it registers with ChatATP API
+- **Smart Routing**: ChatATP backend can now route tool calls directly through your proxy (~200ms)
+- **Graceful Fallback**: If proxy is unavailable, automatically falls back to polling mode
+- **Zero Configuration**: Works automatically once auto-start is enabled
+
+#### 🚀 **Performance Benefits**
+```
+✅ Proxy Available: Agent → POST proxy_url/tools/filesystem → ~200ms ⚡
+❌ Proxy Down:      Agent → stream tool_call → CLI executes → ~2-5s 📡
+```
+
+#### 🔧 **Registration Process**
+
+- **On Startup**: `POST /api/v1/mcp/device/register-proxy/` with proxy URL and server list
+- **On Shutdown**: `DELETE /api/v1/mcp/device/unregister-proxy/` for cleanup
+- **Error Handling**: Registration failures don't break the proxy - it still works locally
+
+#### 🎯 **Use Cases**
+- **Continuous Availability**: Remote clients get fast direct access when proxy is running
+- **Reliable Fallback**: System automatically degrades gracefully when proxy is down
+- **Mixed Environments**: Some clients use proxy, others use polling - both work seamlessly
+- **Development**: Test hybrid routing without manual proxy management
 
 ### 📡 API Endpoints
 
@@ -707,6 +764,7 @@ Once running, the proxy server provides the following REST endpoints:
 - **Secure Tool Sharing**: Share filesystem tools with remote clients over HTTPS
 - **Development Testing**: Test MCP integrations without direct protocol knowledge
 - **Production Deployments**: Run proxy server with custom SSL certificates
+- **Continuous Availability**: Auto-start mode keeps your MCP servers always accessible
 
 ### ⚙️ Configuration & Setup
 
@@ -749,20 +807,21 @@ The proxy server respects the same MCP server configurations as the CLI. Make su
 ### 🌍 Remote Access Example
 
 ```bash
-# Start proxy with ngrok for remote access
-chatatp mcp proxy --https --ngrok --ngrok-token YOUR_NGROK_TOKEN
+# One-time setup for continuous access
+chatatp config enable-proxy-auto-start --ngrok-token YOUR_NGROK_TOKEN
 
-# Output will show:
-# Starting MCP Proxy Server on 127.0.0.1:8001
-# HTTPS enabled with self-signed certificate
-# Ngrok tunnel will be established for public access
-# Public URL: https://abc123.ngrok.io
+# Now every CLI command auto-starts the proxy
+chatatp models
+# → MCP proxy server starts automatically in background
+# → Public URL: https://your-unique-url.ngrok-free.dev
 
-# Now external clients can access:
-# https://abc123.ngrok.io/tools/tavily-mcp/tavily-search
+# Remote clients can now continuously access your MCP servers:
+# https://your-unique-url.ngrok-free.dev/tools/context7/search_web
+# https://your-unique-url.ngrok-free.dev/tools/filesystem/read_text_file
+# https://your-unique-url.ngrok-free.dev/tools/tavily-mcp/tavily-search
 ```
 
-The proxy server will automatically discover and expose all configured MCP servers, providing secure remote access to your local MCP ecosystem!
+The proxy server will automatically discover and expose all configured MCP servers, providing secure remote access to your local MCP ecosystem! Remote MCP clients can now access your local tools (context7 documentation, tavily web search, firecrawl scraping, filesystem operations) via public HTTPS endpoints with zero manual intervention.
 
 ## AI Management
 

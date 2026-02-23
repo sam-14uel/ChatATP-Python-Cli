@@ -16,8 +16,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from pyngrok import ngrok
 
 from .mcp_client import mcp_client_manager
+
+from .config import Config
+from .api_client import ChatATPAPI
 
 logger = logging.getLogger(__name__)
 
@@ -217,8 +221,12 @@ def generate_self_signed_cert(cert_file: str, key_file: str):
 
 def start_ngrok_tunnel(port: int, use_https: bool = False) -> str:
     """Start ngrok tunnel and return the public URL"""
-    try:
-        from pyngrok import ngrok
+    try:       
+        # Disconnect any existing tunnels to avoid conflicts
+        existing_tunnels = ngrok.get_tunnels()
+        for tunnel in existing_tunnels:
+            ngrok.disconnect(tunnel.public_url)
+            logger.info(f"Disconnected existing tunnel: {tunnel.public_url}")
 
         # Configure ngrok
         tunnel_config = {
@@ -250,14 +258,30 @@ def start_proxy_server(host: str = "127.0.0.1", port: int = 8001, use_https: boo
     public_url = None
     if use_ngrok:
         try:
-            import pyngrok
             if ngrok_auth_token:
-                pyngrok.ngrok.set_auth_token(ngrok_auth_token)
+                ngrok.set_auth_token(ngrok_auth_token)
             public_url = start_ngrok_tunnel(port, use_https)
             app.public_url = public_url
             logger.info(f"Public URL: {public_url}")
+            # Also print to console so it's visible in CLI
+            print(f"\n🎉 MCP Proxy Server is now publicly accessible at: {public_url}")
+            print("Remote MCP clients can connect to your local servers via this URL\n")
+
+            # Register proxy with ChatATP API (hybrid mode)
+            try:
+                config = Config()
+                api = ChatATPAPI(config)
+                servers = mcp_client_manager.get_available_servers()
+                api.register_proxy(public_url, servers)
+                logger.info(f"Successfully registered proxy with ChatATP API: {public_url} with servers {servers}")
+                print(f"🔗 Registered proxy with ChatATP API (hybrid mode enabled)\n")
+            except Exception as e:
+                logger.warning(f"Failed to register proxy with ChatATP API: {e}")
+                print(f"⚠️  Proxy registration failed, but server is still running: {e}\n")
         except Exception as e:
             logger.warning(f"Failed to start ngrok tunnel: {e}")
+            print(f"\n⚠️  Failed to establish ngrok tunnel: {e}")
+            print("Server will run locally only\n")
 
     # Configure HTTPS if requested
     ssl_context = None

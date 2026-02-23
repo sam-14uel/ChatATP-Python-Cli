@@ -108,6 +108,32 @@ class Config:
     @proxy_enabled.setter
     def proxy_enabled(self, value: bool):
         self._config['proxy_enabled'] = value
+
+    @propertly
+    def proxy_ngrok_token(self) -> Optional[str]:
+        return self._config.get('proxy_ngrok_token')
+
+    @proxy_ngrok_token.setter
+    def proxy_ngrok_token(self, value: str):
+        self._config['proxy_ngrok_token'] = value
+        self.save_config()
+
+    @property
+    def proxy_auto_start(self) -> bool:
+        return self._config.get('proxy_auto_start', False)
+
+    @proxy_auto_start.setter
+    def proxy_auto_start(self, value: bool):
+        self._config['proxy_auto_start'] = value
+        self.save_config()
+
+    @property
+    def proxy_use_ngrok(self) -> bool:
+        return self._config.get('proxy_use_ngrok', True)
+
+    @proxy_use_ngrok.setter
+    def proxy_use_ngrok(self, value: bool):
+        self._config['proxy_use_ngrok'] = value
         self.save_config()
 
     def get_headers(self) -> dict:

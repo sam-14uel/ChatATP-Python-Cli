@@ -62,6 +62,18 @@ class ChatATPAPI:
         """List MCP servers"""
         return self._get('/api/v1/mcp/servers/')
 
+    def register_proxy(self, proxy_url: str, servers: List[str]) -> Dict:
+        """Register MCP proxy server with ChatATP API"""
+        data = {
+            "proxy_url": proxy_url,
+            "servers": servers
+        }
+        return self._post('/api/v1/mcp/device/register-proxy/', data)
+
+    def unregister_proxy(self) -> Dict:
+        """Unregister MCP proxy server from ChatATP API"""
+        return self._delete('/api/v1/mcp/device/unregister-proxy/')
+
     # Chat endpoints
     def list_chatrooms(self) -> Dict:
         """List chatrooms"""
